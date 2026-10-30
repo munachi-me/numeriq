@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createDataset, parseCSV, parseJSON, ValidationError } from '../src/index.js';
+
+test('creates datasets and exposes pandas-like shape properties',()=>{const d=createDataset([{a:1,b:'x'},{a:2,b:'y'}]);assert.deepEqual(d.shape,[2,2]);assert.equal(d.ndim,2);assert.equal(d.size,4);assert.equal(d.empty,false);assert.deepEqual(d.columns,['a','b']);assert.deepEqual(d.index,[0,1]);});
+test('normalizes values and infers types without destroying leading zero identifiers',()=>{const d=createDataset([{id:'0012',amount:'12.5',active:'true',blank:'  '}]);assert.equal(d.rows[0].id,'0012');assert.equal(d.rows[0].amount,12.5);assert.equal(d.rows[0].active,true);assert.equal(d.rows[0].blank,null);assert.equal(d.dtypes.amount,'number');});
+test('supports array rows and column-oriented input',()=>{assert.deepEqual(createDataset([[1,'a']],{columns:['n','s']}).rows,[{n:1,s:'a'}]);assert.deepEqual(createDataset({a:[1,2],b:['x','y']}).shape,[2,2]);});
+test('supports immutable transformations and chaining',()=>{const d=createDataset([{n:1,s:'a'},{n:3,s:'b'},{n:3,s:'b'}]);const out=d.filter(r=>r.n>1).sortBy('n','desc').dropDuplicates();assert.equal(out.length,1);assert.equal(d.length,3);assert.deepEqual(d.select('s').columns,['s']);assert.deepEqual(d.renameColumn('s','label').columns,['n','label']);assert.equal(d.addColumn('double',r=>r.n*2).rows[1].double,6);});
+test('statistics ignore missing and nonnumeric values',()=>{const d=createDataset([{v:1},{v:2},{v:null},{v:3}]);assert.equal(d.count('v'),3);assert.equal(d.sum('v'),6);assert.equal(d.mean('v'),2);assert.equal(d.median('v'),2);assert.equal(d.variance('v'),2/3);assert.equal(d.std('v'),Math.sqrt(2/3));assert.equal(d.min('v'),1);assert.equal(d.max('v'),3);});
+test('empty and invalid inputs behave predictably',()=>{assert.equal(createDataset([]).empty,true);assert.deepEqual(createDataset([]).shape,[0,0]);assert.throws(()=>createDataset('bad'),ValidationError);assert.throws(()=>createDataset([[1,2]]),ValidationError);});
+test('CSV and JSON parsing use the same dataset model',()=>{assert.deepEqual(parseCSV('name,age\nAda,36\nLin,27').shape,[2,2]);assert.equal(parseJSON('[{"x":"2"}]').rows[0].x,2);});
+test('table output includes headers and dimensions',()=>{const d=createDataset([{x:1},{x:2}]);const table=d.toTable();assert.match(table,/Index/);assert.match(table,/2 rows × 1 columns/);assert.match(d[Symbol.for('nodejs.util.inspect.custom')](),/┌/);});
+test('count includes non-null categorical values and tail zero is empty',()=>{const d=createDataset([{label:'a'},{label:'b'},{label:null}]);assert.equal(d.count('label'),2);assert.equal(d.tail(0).length,0);});
+test('column series supports descriptive statistics',()=>{const s=createDataset([{v:2},{v:4}]).column('v');assert.equal(s.mean(),3);assert.equal(s.sum(),6);assert.equal(s.describe().count,2);});

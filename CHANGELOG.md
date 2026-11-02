@@ -9,7 +9,7 @@
 - Added basic CSV and JSON parsing helpers.
 - Added editable example and Node test/watch scripts.
 
-## Unreleased
+## 0.1.1 — Local imports and complete summaries
 
 - Added local CSV, TSV, and JSON loaders restricted to the consuming project's `dataset/` folder, plus HTTP(S) URL loading.
 - Expanded `describe()` to summarize all columns, include distinct counts, and return tabular summaries or a single-column object.

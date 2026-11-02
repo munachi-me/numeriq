@@ -1,4 +1,4 @@
-# Verification Record — Working Branch
+# Verification Record — v0.1.1 Working Branch
 
 Environment: Node.js 22.16.0, npm 10.9.2.
 

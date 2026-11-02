@@ -2,7 +2,7 @@
 
 **JavaScript Data Science Engine** — a lightweight, framework-independent foundation for working with tabular data in JavaScript.
 
-> Version 0.1.0 is the foundational release. It is an early development build, not yet a production-stability promise.
+> Version 0.1.1 builds on the v0.1.0 foundation. Numeriq remains an early development build, not yet a production-stability promise.
 
 ## Requirements
 
@@ -62,7 +62,7 @@ When consuming the package after publishing, use `import { createDataset } from 
 | `rows` | Defensive copy of records |
 | `metadata` | User-supplied metadata |
 
-## API in v0.1.0
+## API in v0.1.1
 
 ### Create and inspect
 

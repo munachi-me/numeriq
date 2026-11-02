@@ -2,7 +2,7 @@
 
 **JavaScript Data Science Engine** — a lightweight, framework-independent foundation for working with tabular data in JavaScript.
 
-> Version 0.1.0 is the foundational release. It is an early development build, not yet a production-stability promise.
+> Version 0.1.1 builds on the v0.1.0 foundation. Numeriq remains an early development build, not yet a production-stability promise.
 
 ## Requirements
 
@@ -62,7 +62,7 @@ When consuming the package after publishing, use `import { createDataset } from 
 | `rows` | Defensive copy of records |
 | `metadata` | User-supplied metadata |
 
-## API in v0.1.0
+## API in v0.1.1
 
 ### Create and inspect
 
@@ -72,6 +72,7 @@ When consuming the package after publishing, use `import { createDataset } from 
 - `dataset.column(name)` returns a `Series`
 
 Creation also accepts arrays of arrays when `options.columns` is supplied, and column-oriented objects whose values are equal-length arrays.
+`dataset.describe()` returns a table-like Dataset with a summary row for every column. It includes count, missing values, distinct values, and numeric statistics; numeric statistics are `null` for nonnumeric or mixed columns. `dataset.describe('column')` returns that column's summary as a plain object.
 
 ### Transform
 
@@ -86,18 +87,18 @@ Transformations return new datasets; the original is not mutated.
 
 `count`, `sum`, `mean`, `median`, `min`, `max`, `range`, `variance`, and `std` are available on datasets by column name. A column `Series` also exposes these methods and `describe()`.
 
-Statistics include finite numeric values only. Variance and standard deviation default to population calculations (`ddof = 0`); pass `ddof = 1` for sample calculations. Empty numeric inputs return `null` for statistics that require values; `sum` returns `0`.
+Statistics include finite numeric values only. Variance and standard deviation default to population calculations (`ddof = 0`); pass `ddof = 1` for sample calculations. Empty numeric inputs return `null` for statistics that require values; `sum` returns `0`. Describe summaries also include distinct non-missing values for categorical columns.
 
 ### Import helpers
 
 - `parseCSV(text, options?)` — basic quoted-cell parsing and delimiter detection for comma, tab, semicolon, and pipe.
 - `parseJSON(textOrValue, options?)` — JSON arrays of records or column-oriented objects.
 
-These are foundational parsers. Advanced malformed-file recovery, streaming, Excel support, remote URL loading, and richer import reports are planned for later versions.
+`loadCSV(filenameOrURL)`, `loadJSON(filenameOrURL)`, and `loadData(filenameOrURL)` read local files or HTTP(S) URLs and return Numeriq Datasets. Local files are resolved only from a `dataset/` folder beside the consuming project's `package.json`; path traversal and symlinks escaping that folder are rejected. The current file formats are CSV, TSV, and JSON. Put local data in `dataset/` and call `await loadCSV('sales.csv')` or `await loadJSON('records.json')`. `loadCSV` also dispatches a `.json` filename or URL to the JSON loader; `loadData` is the generic extension-based loader.
 
 ### Display
 
-In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display a table. Also available: `dataset.toTable(options?)`, `dataset.display(options?)`, and `dataset.print(options?)`. Browser developer consoles do not necessarily honor Node's inspection hook; use `toTable()` or `display()` there.
+In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display a table whose row-index heading is `idx`. Also available: `dataset.toTable(options?)`, `dataset.display(options?)`, and `dataset.print(options?)`. Wide tables show up to 20 columns by default and indicate omitted columns; configure `maxColumns` to change the limit. Browser developer consoles do not necessarily honor Node's inspection hook; use `toTable()` or `display()` there.
 
 ## Scripts
 
@@ -111,7 +112,7 @@ In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display
 ## Development roadmap
 
 - `0.1.0` Foundation: dataset model, inspection, transformations, descriptive statistics, display, basic CSV/JSON.
-- `0.2.0` Data import and preparation: Excel/TSV/URL, robust parsing, profiling, missing values and cleaning.
+- `0.2.0` Data import and preparation: Excel import, import reports, profiling, missing-value handling, and cleaning.
 - `0.3.0` Advanced transformations: calculated columns, split/combine, date/time and text operations.
 - `0.4.0` Query and filtering engine.
 - `0.5.0` Grouping and aggregation.

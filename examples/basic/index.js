@@ -1,4 +1,4 @@
-import { createDataset } from '../../src/index.js';
+import { createDataset, loadCSV } from '../../src/index.js';
 
 // Edit this file to experiment with Numeriq. `npm run dev` reruns it on save.
 const sales = createDataset([
@@ -14,3 +14,5 @@ console.log('SHAPE:', sales.shape);
 console.log('SUMMARY:', sales.describe());
 console.log('EXPENSIVE PRODUCTS');
 console.log(sales.filter(row => row.price > 500).sortBy('price', 'desc').select('product', 'price'));
+console.log('LOADED FROM dataset/sales.csv');
+console.log(await loadCSV('sales.csv'));

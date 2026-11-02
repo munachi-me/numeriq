@@ -1,0 +1,1 @@
+Put local CSV, TSV, and JSON files here; loaders resolve local names only within this folder.

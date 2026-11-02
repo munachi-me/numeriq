@@ -42,7 +42,15 @@ export class Dataset {
   tail(n=5) { const count=validCount(n); return this.#new(count===0?[]:this.#rows.slice(-count)); }
   preview(n=10) { return this.head(n); }
   info() { return { name:this.name, rows:this.length, columns:this.#columns.length, shape:this.shape, dtypes:this.dtypes, missingValues:this.#columns.reduce((s,c)=>s+this.#rows.filter(r=>r[c]==null).length,0) }; }
-  describe(column) { if (column) return stats.describe(this.#rows.map(r=>r[column])); return Object.fromEntries(this.#columns.filter(c=>['integer','number'].includes(this.dtypes[c])).map(c=>[c,stats.describe(this.#rows.map(r=>r[c]))])); }
+  describe(column) {
+    const summaryColumns = ['column', 'count', 'missing', 'distinct', 'mean', 'median', 'min', 'max', 'range', 'variance', 'std'];
+    if (column !== undefined) {
+      this.#assertColumn(column);
+      return { column, ...stats.describe(this.#rows.map(row => row[column])) };
+    }
+    const summaries = this.#columns.map(name => ({ column: name, ...stats.describe(this.#rows.map(row => row[name])) }));
+    return new Dataset(summaries, { columns: summaryColumns, name: `${this.name} description` });
+  }
   column(name) { this.#assertColumn(name); return new Series(name,this.#rows.map(r=>r[name])); }
   select(...columns) { const cols=flatten(columns); cols.forEach(c=>this.#assertColumn(c)); return this.#new(this.#rows.map(r=>Object.fromEntries(cols.map(c=>[c,r[c]]))),cols); }
   dropColumns(...columns) { const drop=new Set(flatten(columns)); const cols=this.#columns.filter(c=>!drop.has(c)); return this.select(...cols); }

@@ -1,32 +1,105 @@
+import { ValidationError } from '../errors/index.js';
+
+const DEFAULT_MISSING_VALUES = ['null', 'undefined', 'n/a', 'na'];
+const NUMERIC_PATTERN = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i;
+
 export function normalizeValue(value, options = {}) {
-  const { trimStrings = true, emptyStringAsNull = true, inferTypes = true, missingValues = ['null', 'undefined', 'n/a', 'na'] } = options;
+  const {
+    trimStrings = true,
+    emptyStringAsNull = true,
+    inferTypes = true,
+    missingValues = DEFAULT_MISSING_VALUES
+  } = options;
   if (value === undefined || value === null) return null;
   if (typeof value !== 'string') return value;
   const text = trimStrings ? value.trim() : value;
-  if (emptyStringAsNull && text === '') return null;
-  if (missingValues.some(v => String(v).toLowerCase() === text.toLowerCase())) return null;
+  if (emptyStringAsNull && text.trim() === '') return null;
+  const missingMarkers = Array.isArray(missingValues) ? missingValues : [missingValues];
+  if (missingMarkers.some(marker => String(marker).toLowerCase() === text.trim().toLowerCase())) return null;
   if (!inferTypes || text === '') return text;
   if (/^(true|false)$/i.test(text)) return text.toLowerCase() === 'true';
-  // Do not coerce strings with leading zeroes: they may be identifiers.
-  if (!/^[-+]?0\d/.test(text) && /^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i.test(text)) {
-    const n = Number(text); if (Number.isFinite(n)) return n;
+  // Keep leading-zero identifiers unchanged unless the caller explicitly casts them.
+  if (!/^[-+]?0\d/.test(text) && NUMERIC_PATTERN.test(text)) {
+    const number = Number(text);
+    if (Number.isFinite(number)) return number;
   }
   return text;
 }
 
+export function castValue(value, type, options = {}) {
+  const target = normalizeTypeName(type);
+  if (!target) throw new ValidationError(`Unsupported data type: ${type}`);
+  const normalized = normalizeValue(value, { ...(options.normalization ?? {}), ...options, inferTypes: false });
+  if (normalized === null) return null;
+
+  if (target === 'string') {
+    if (normalized instanceof Date) return normalized.toISOString();
+    if (typeof normalized === 'object') throw castError(value, type);
+    return String(normalized);
+  }
+  if (target === 'number' || target === 'integer') {
+    const number = typeof normalized === 'number'
+      ? normalized
+      : typeof normalized === 'string' && NUMERIC_PATTERN.test(normalized.trim())
+        ? Number(normalized.trim())
+        : Number.NaN;
+    if (!Number.isFinite(number) || (target === 'integer' && !Number.isInteger(number))) throw castError(value, type);
+    return number;
+  }
+  if (target === 'boolean') {
+    if (typeof normalized === 'boolean') return normalized;
+    if (normalized === 1 || normalized === '1' || (typeof normalized === 'string' && normalized.trim().toLowerCase() === 'true')) return true;
+    if (normalized === 0 || normalized === '0' || (typeof normalized === 'string' && normalized.trim().toLowerCase() === 'false')) return false;
+    throw castError(value, type);
+  }
+  if (target === 'date') {
+    if (normalized instanceof Date && !Number.isNaN(normalized.getTime())) return new Date(normalized);
+    if (typeof normalized !== 'string') throw castError(value, type);
+    const text = normalized.trim();
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/;
+    const timestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/i;
+    if (!dateOnly.test(text) && !timestamp.test(text)) throw castError(value, type);
+    const datePart = text.slice(0, 10);
+    const calendarDate = new Date(`${datePart}T00:00:00.000Z`);
+    if (Number.isNaN(calendarDate.getTime()) || calendarDate.toISOString().slice(0, 10) !== datePart) throw castError(value, type);
+    const date = new Date(text);
+    if (Number.isNaN(date.getTime())) throw castError(value, type);
+    if (dateOnly.test(text) && date.toISOString().slice(0, 10) !== text) throw castError(value, type);
+    return date;
+  }
+  throw new ValidationError(`Unsupported data type: ${type}`);
+}
+
 export function inferType(values) {
-  const present = values.filter(v => v !== null && v !== undefined);
+  const present = values.filter(value => value !== null && value !== undefined);
   if (!present.length) return 'unknown';
-  if (present.every(v => typeof v === 'boolean')) return 'boolean';
-  if (present.every(v => typeof v === 'number' && Number.isFinite(v))) return present.every(Number.isInteger) ? 'integer' : 'number';
-  if (present.every(v => v instanceof Date && !Number.isNaN(v.getTime()))) return 'date';
-  if (present.every(v => typeof v === 'string')) return 'string';
+  if (present.every(value => typeof value === 'boolean')) return 'boolean';
+  if (present.every(value => typeof value === 'number' && Number.isFinite(value))) return present.every(Number.isInteger) ? 'integer' : 'number';
+  if (present.every(value => value instanceof Date && !Number.isNaN(value.getTime()))) return 'date';
+  if (present.every(value => typeof value === 'string')) return 'string';
   return 'mixed';
 }
 
 export function cloneValue(value) {
   if (value instanceof Date) return new Date(value);
   if (Array.isArray(value)) return value.map(cloneValue);
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, cloneValue(v)]));
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, cloneValue(item)]));
   return value;
+}
+
+function normalizeTypeName(type) {
+  const name = String(type ?? '').toLowerCase();
+  if (['string', 'text'].includes(name)) return 'string';
+  if (['number', 'float', 'decimal'].includes(name)) return 'number';
+  if (['integer', 'int'].includes(name)) return 'integer';
+  if (['boolean', 'bool'].includes(name)) return 'boolean';
+  if (name === 'date') return 'date';
+  return null;
+}
+
+function castError(value, type) {
+  let rendered;
+  try { rendered = JSON.stringify(value); }
+  catch { rendered = String(value); }
+  return new ValidationError(`Cannot cast ${rendered} to ${type}.`);
 }

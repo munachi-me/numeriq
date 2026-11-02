@@ -1,6 +1,6 @@
 {
   "name": "numeriq",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A lightweight JavaScript data science engine.",
   "type": "module",
   "main": "./src/index.js",
@@ -8,5 +8,5 @@
   "scripts": { "test": "node --test", "test:watch": "node --test --watch", "dev": "node --watch examples/basic/index.js", "start": "node examples/basic/index.js" },
   "engines": { "node": ">=20" },
   "license": "MIT",
-  "files": ["src", "README.md", "LICENSE", "CHANGELOG.md"]
+  "files": ["src", "dataset/samples", "README.md", "LICENSE", "CHANGELOG.md"]
 }

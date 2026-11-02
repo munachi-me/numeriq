@@ -1,0 +1,6 @@
+[
+  { "customer": "Ada", "region": "North", "revenue": 1200 },
+  { "customer": "Lin", "region": "South", "revenue": 850 },
+  { "customer": "Mina", "region": "North", "revenue": 1200 },
+  { "customer": "Noor", "region": "West", "revenue": 640 }
+]

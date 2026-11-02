@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 — Data import and preparation
+
+- Added bundled CSV, TSV, and JSON sample datasets via `useSampleDataset()`.
+- Added headerless imports, skipped-row controls, strict/lenient shape validation, schemas, custom missing markers, whitespace controls, and immutable import reports.
+- Added explicit project-root loading, HTTP API request options, response content-type detection, and multi-source imports with optional deduplication.
+- Added `Dataset.profile()`, `dropMissing()`, `fillMissing()`, and `castColumn()` with explicit conversion-error behavior.
+- Kept the core dependency-free; Excel import remains deferred.
+
 ## 0.1.0 — Initial foundation
 
 - Added immutable tabular Dataset model and `createDataset`.

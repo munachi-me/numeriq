@@ -7,14 +7,18 @@ import { loadCSV, loadJSON, loadData, createDataset, ValidationError } from '../
 
 test('loads local CSV and JSON files from the project dataset directory', async () => {
   const sales = await loadCSV('sales.csv');
-  assert.deepEqual(sales.shape, [3, 3]);
-  assert.deepEqual(sales.rows[0], { product: 'Laptop', price: 1200, quantity: 3 });
+  assert.deepEqual(sales.shape, [25, 6]);
+  assert.deepEqual(sales.rows[0], { Transaction_ID: 1001, Date: '2026-01-05', Product: 'Wireless Mouse', Category: 'Electronics', Quantity: 3, Total_Amount: 74.97 });
+  assert.equal(sales.dtypes.Date, 'date');
+  assert.deepEqual((await loadCSV('sales.tsv')).rows, sales.rows);
+  assert.deepEqual((await loadJSON('sales.json')).rows, sales.rows);
+  assert.deepEqual((await loadCSV('sales.json')).rows, sales.rows);
   assert.deepEqual((await loadJSON('people.json')).rows, [
     { name: 'Ada', active: true },
     { name: 'Lin', active: false }
   ]);
   assert.deepEqual((await loadCSV('people.json')).rows[0], { name: 'Ada', active: true });
-  assert.deepEqual((await loadData('sales.csv')).shape, [3, 3]);
+  assert.deepEqual((await loadData('sales.csv')).shape, [25, 6]);
 });
 
 test('supports quoted CSV fields, escaped quotes, and embedded newlines', async () => {
@@ -90,4 +94,11 @@ test('wide table display bounds the visible columns while retaining dimensions',
   const table = createDataset(columns).toTable({ maxColumns: 5 });
   assert.match(table, /… 20 more/);
   assert.match(table, /1 rows × 25 columns/);
+});
+
+test('table display defaults to 100 rows and validates explicit maxRows', () => {
+  const dataset = createDataset(Array.from({ length: 101 }, (_, index) => ({ value: index })));
+  assert.match(dataset.toTable(), /… 1 more rows/);
+  assert.match(dataset.toTable({ maxRows: 10 }), /… 91 more rows/);
+  assert.throws(() => dataset.toTable({ maxRows: -1 }), /maxRows/);
 });

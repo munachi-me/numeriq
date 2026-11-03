@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 — Advanced transformations
+
+- Added immutable column reordering, multi-column renaming, splitting/combining, text replacement, trimming, case conversion, and conditional updates.
+- Added decimal rounding, IQR outlier flags, and date-part extraction for day, ISO weekday/week, month, English month name, quarter, and year.
+- Added `date`, `datetime`, and `time` inference/casting, including configurable per-column input formats in casts and CSV/JSON schemas.
+- Added serializable, replayable transformation pipelines with JSON-safe expressions and per-step shape/row/column summaries.
+- Changed table rendering's default row limit to 100 and replaced the bundled sales sample with the supplied 25 transactions in CSV, TSV, and JSON.
+- Kept the core dependency-free; Excel remains deferred.
+
 ## 0.2.0 — Data import and preparation
 
 - Added bundled CSV, TSV, and JSON sample datasets via `useSampleDataset()`.

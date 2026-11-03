@@ -2,14 +2,14 @@
 
 **JavaScript Data Science Engine** — a lightweight, framework-independent foundation for working with tabular data in JavaScript.
 
-> Version 0.2.0 builds on the v0.1.x foundation with dependency-free data import and preparation. Numeriq remains an early development build, not yet a production-stability promise.
+> Version 0.3.0 adds dependency-free advanced transformations, temporal types, and replayable transformation pipelines. Numeriq remains an early development build, not yet a production-stability promise.
 
 ## Requirements
 
 - Node.js 20 or newer
-- npm (no mandatory runtime dependencies)
+- npm; no mandatory runtime dependencies
 
-## Install / run locally
+## Install and run locally
 
 From this extracted project folder:
 
@@ -18,33 +18,26 @@ npm test
 npm run dev
 ```
 
-`npm run dev` watches `examples/basic/index.js` and reruns it whenever you save changes. Edit that file to write your own analysis.
+`npm run dev` watches `examples/basic/index.js` and reruns it whenever you save changes. Edit that file to experiment with Numeriq.
 
 ## Quick start
 
 ```js
-import { createDataset } from './src/index.js';
+import { loadCSV, createPipeline } from './src/index.js';
 
-const sales = createDataset([
-  { product: 'Laptop', price: 1200, quantity: 3 },
-  { product: 'Phone', price: 800, quantity: 5 },
-  { product: 'Tablet', price: 400, quantity: 2 }
-], { name: 'Sales' });
+const sales = await loadCSV('sales.csv'); // local files are read from dataset/
+const pipeline = createPipeline([
+  { op: 'extractDatePart', column: 'Date', part: 'monthName', options: { as: 'Month' } },
+  { op: 'roundColumn', column: 'Total_Amount', precision: 2 },
+  { op: 'flagOutliers', column: 'Total_Amount', options: { as: 'Amount_Outlier' } }
+]);
 
-console.log(sales);           // SQL-style table in Node.js
-console.log(sales.shape);     // [3, 3]
-console.log(sales.dtypes);    // inferred column types
-console.log(sales.describe());
-
-const expensive = sales
-  .filter(row => row.price > 500)
-  .sortBy('price', 'desc')
-  .select('product', 'price');
-
-console.log(expensive);
+const { dataset, summary } = pipeline.run(sales);
+console.log(dataset.head(8));
+console.log(summary);
 ```
 
-When consuming the package after publishing, use `import { createDataset } from 'numeriq'`.
+When consuming the package after publishing, use `import { createDataset, createPipeline } from 'numeriq'`.
 
 ## Dataset properties
 
@@ -56,64 +49,101 @@ When consuming the package after publishing, use `import { createDataset } from 
 | `empty` | True if either dimension is zero |
 | `length` | Number of rows |
 | `columns` | Ordered column-name array |
-| `dtypes` | Inferred type per column (`integer`, `number`, `string`, `boolean`, `date`, `mixed`, `unknown`) |
+| `dtypes` | Inferred types: `integer`, `number`, `string`, `boolean`, `date`, `datetime`, `time`, `mixed`, `unknown` |
 | `schema` | Column metadata including inferred type and nullability |
 | `index` | Zero-based row indices |
 | `rows` | Defensive copy of records |
 | `metadata` | User-supplied metadata |
 
-## API in v0.2.0
-
-### Create and inspect
+## Create and inspect
 
 - `createDataset(records, options?)`
 - `dataset.head(n?)`, `tail(n?)`, `preview(n?)`
 - `dataset.info()`, `dataset.describe(column?)`, `dataset.profile(options?)`
 - `dataset.column(name)` returns a `Series`
 
-Creation also accepts arrays of arrays when `options.columns` is supplied, and column-oriented objects whose values are equal-length arrays.
-`dataset.describe()` returns a table-like Dataset with a summary row for every column. It includes count, missing values, distinct values, and numeric statistics; numeric statistics are `null` for nonnumeric or mixed columns. `dataset.describe('column')` returns that column's summary as a plain object.
-Imported datasets expose a frozen `dataset.importReport` describing source format, imported rows, columns, missing counts, and any lenient-mode warnings. Manually created or transformed datasets have `importReport === null`.
+Creation also accepts arrays of arrays when `options.columns` is supplied, and column-oriented objects whose values are equal-length arrays. `describe()` returns a table-like Dataset with a summary row for every column; `describe('column')` returns a keyed summary object. `profile()` reports missingness, distinct values, frequent categories, constants, and duplicate rows.
 
-### Transform
+## Transformations
 
-- `select(...columns)`, `dropColumns(...columns)`, `renameColumn(oldName, newName)`
-- `filter(predicate)`, `sortBy(column, 'asc' | 'desc')`, `limit(count)`
+All Dataset transformations are immutable: they return a new Dataset and leave the original unchanged.
+
+### Columns and text
+
+- `select(...columns)`, `reorderColumns(...columns)`, `dropColumns(...columns)`
+- `renameColumn(oldName, newName)`, `renameColumns({ oldName: newName })`
+- `splitColumn(column, { delimiter, into, dropOriginal?, trim? })`
+- `combineColumns(name, columns, { separator?, skipMissing?, dropSource? })`
+- `replaceText(column, search, replacement, { caseSensitive?, all? })`
+- `trimColumn(column, { side: 'both' | 'start' | 'end' })`
+- `changeCase(column, 'lower' | 'upper' | 'title')`
+- `updateColumnWhere(column, predicate, valueOrFunction)`
 - `addColumn(name, valueOrFunction)`, `mapRows(mapper)`
-- `dropDuplicates(...columns)`, `unique(column)`, `nunique(column)`, `clone()`
-- `dropMissing({ columns?, how? })`, `fillMissing(column, valueOrFunction)`, `castColumn(column, type, options?)`
 
-Transformations return new datasets; the original is not mutated.
-`dropMissing()` removes rows with any missing value by default; use `how: 'all'` to remove rows missing all selected columns. `fillMissing` changes only `null`/`undefined` cells in the named column. `castColumn` supports `string`, `number`, `integer`, `boolean`, and ISO `date`; invalid casts throw by default, or become `null` with `{ errors: 'coerce' }`.
+`splitColumn` replaces the source column by default, puts any remaining split pieces into the last output column, and trims each piece. Set `dropOriginal: false` to retain the source. `combineColumns` keeps its sources by default, skips missing values, and appends the new column; set `dropSource: true` to replace the source columns. Text search is a literal string, not a regular expression. Replacement is global and case-sensitive by default. Non-string values are left unchanged by text operations.
 
-`profile({ topValues? })` returns a plain report with row/column counts, duplicate-row totals, per-column inferred type, missing counts and percentages, distinct counts, frequent categorical values, and constant-column names. Profiling does not modify data.
+### Numeric and conditional operations
 
-### Statistics
+- `roundColumn(column, precision = 0)` rounds finite numeric cells to 0–15 decimal places.
+- `flagOutliers(column, { method: 'iqr', factor?, as? })` adds a boolean flag using interpolated quartiles and the IQR fences. Missing values receive `null`; with fewer than four observed values, all observed values receive `false`.
+- Existing helpers include `filter(predicate)`, `sortBy(column, direction?)`, `limit(count)`, `dropDuplicates(...columns)`, `unique(column)`, `nunique(column)`, `dropMissing({ columns?, how? })`, and `fillMissing(column, valueOrFunction)`.
 
-`count`, `sum`, `mean`, `median`, `min`, `max`, `range`, `variance`, and `std` are available on datasets by column name. A column `Series` also exposes these methods and `describe()`.
+`addColumn` accepts either a literal or a callback `(row, index) => value`. `updateColumnWhere` takes a predicate `(row, index) => boolean` and a literal or replacement callback.
 
-Statistics include finite numeric values only. Variance and standard deviation default to population calculations (`ddof = 0`); pass `ddof = 1` for sample calculations. Empty numeric inputs return `null` for statistics that require values; `sum` returns `0`. Describe summaries also include distinct non-missing values for categorical columns.
+### Date, datetime, and time
 
-### Import helpers
+ISO date strings (`YYYY-MM-DD`), ISO datetime strings, and ISO clock strings can be inferred as `date`, `datetime`, and `time`. Use `castColumn` when input text uses another format:
+
+```js
+const typed = data
+  .castColumn('day', 'date', { format: 'DD/MM/YYYY' })
+  .castColumn('started_at', 'datetime', { format: 'MM/DD/YYYY hh:mm A' })
+  .castColumn('clock', 'time', { format: 'hh:mm:ss A' });
+```
+
+Supported format tokens are `YYYY`, `MM`/`M`, `MMM`/`MMMM`, `DD`/`D`, `HH`/`H`, `hh`/`h` with `A` for AM/PM, `mm`/`m`, `ss`/`s`, `SSS`, and `Z` for a datetime timezone offset. For datetime formats without `Z`, input is interpreted as UTC. Cast date values are JavaScript `Date` objects at UTC midnight; datetime values are canonical ISO strings in UTC; time values are canonical `HH:mm:ss.SSS` strings. Import schemas can use the same per-column descriptor, for example `{ schema: { day: { type: 'date', format: 'DD/MM/YYYY' } } }`.
+
+`extractDatePart(column, part, { as? })` accepts a `date` or `datetime` column and appends a new column. Parts are `day`, `weekday`, `week`, `month`, `monthName`, `quarter`, and `year`. Week and weekday use ISO-8601 rules: Monday is weekday 1, Sunday is 7, and week 1 is the week containing the year's first Thursday. Month names are English. Extraction uses UTC consistently; missing values remain `null`. The default output name is `${column}_${part}`.
+
+### Replayable pipelines and transformation summaries
+
+Create a declarative pipeline from JSON-safe operation descriptors. `run(dataset)` returns `{ dataset, summary }`; each summary step includes shapes, rows added/removed, and columns added/removed. Pipelines can be serialized with `JSON.stringify(pipeline)` and restored with `TransformationPipeline.fromJSON()` or `createPipeline(document)`.
+
+```js
+const pipeline = createPipeline([
+  { op: 'roundColumn', column: 'price', precision: 2 },
+  { op: 'addColumn', name: 'total', expression: {
+      op: 'multiply', args: [{ column: 'price' }, { column: 'quantity' }]
+  }},
+  { op: 'updateColumnWhere', column: 'tier',
+    where: { op: 'gt', args: [{ column: 'total' }, { literal: 1000 }] },
+    value: 'high' }
+]);
+const { dataset: result, summary } = pipeline.run(data);
+```
+
+Pipeline steps do not accept callbacks, so a serialized pipeline is replayable. `addColumn` and `updateColumnWhere` support JSON-safe expression trees. Expression operations include arithmetic (`add`, `subtract`, `multiply`, `divide`), comparisons (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`), boolean operations (`and`, `or`, `not`), `if`, `coalesce`, and `concat`. Column references use `{ column: 'name' }`; constants use `{ literal: value }`.
+
+## Statistics
+
+`count`, `sum`, `mean`, `median`, `min`, `max`, `range`, `variance`, and `std` are available on datasets by column name. A column `Series` also exposes these methods and `describe()`. Statistics include finite numeric values only. Variance and standard deviation default to population calculations (`ddof = 0`); pass `ddof = 1` for sample calculations. Empty numeric inputs return `null` for statistics that require values; `sum` returns `0`.
+
+## Import helpers and sample files
 
 - `parseCSV(text, options?)`, `parseJSON(textOrValue, options?)`
 - `loadCSV(filenameOrURL, options?)`, `loadJSON(filenameOrURL, options?)`, `loadData(filenameOrURL, options?)`
-- `loadMany(sources, options?)` for combining several CSV/TSV/JSON sources
-- `useSampleDataset(format?)` for the bundled CSV, TSV, or JSON sales sample (`csv` is the default)
+- `loadMany(sources, options?)` for combining CSV/TSV/JSON sources
+- `useSampleDataset(format?)` for the bundled sample (`csv` by default)
 
-Importers return Numeriq Datasets through the same normalization pipeline. Supported formats are CSV, TSV, and JSON; delimiter detection supports comma, tab, semicolon, and pipe. CSV options include `header: false`, `columns`, `skipRows`, `delimiter`, `strict`, `schema`, `nullValues`, `trimStrings`, and `onInvalid: 'null'`. JSON accepts arrays of records, column-oriented objects, and arrays of arrays when `columns` is provided. Structural row-width/array-length errors throw by default; set `strict: false` to pad missing cells with `null` or omit extra cells and inspect warnings in `importReport`.
+The v0.3.0 sample is the supplied 25-transaction dataset in `dataset/samples/sales.csv`, `sales.tsv`, and `sales.json`. Equivalent local files are available at `dataset/sales.csv`, `sales.tsv`, and `sales.json`.
 
-Local filenames are resolved only from a `dataset/` folder beside the consuming project's `package.json`; path traversal and symlinks escaping that folder are rejected. To load from a different working directory, pass an explicit `projectRoot` pointing at the project directory; local files remain confined to its `dataset/` folder. Example: `await loadCSV('sales.csv', { projectRoot: '/path/to/project', schema: { revenue: 'number' }, nullValues: ['-', 'missing'] })`.
+Importers support delimiter detection, headerless CSV, skipped rows, strict/lenient shape validation, schemas, custom missing markers, whitespace controls, and frozen import reports. Schema values may be simple type names or `{ type, format }` descriptors. Local filenames are resolved only from the consuming project's `dataset/` folder; path traversal and symlinks escaping that folder are rejected. Pass an explicit `projectRoot` when the process is started elsewhere. HTTP(S) requests support `method`, `headers`, and `body`; `loadData` detects formats by filename or response content type. `loadMany` supports union or strict column strategies and optional deduplication.
 
-HTTP(S) URLs support GET by default and API requests with `method`, `headers`, and `body`. Object/array request bodies are sent as JSON. `loadData` chooses a parser from the filename extension or the response `Content-Type`; for extensionless endpoints without a recognized content type, set `format: 'csv' | 'tsv' | 'json'`.
+No Excel importer or third-party runtime dependency is included; Excel remains deferred.
 
-`loadMany(['north.csv', { source: 'south.json' }], { columnStrategy: 'union', deduplicateBy: ['id'] })` combines rows in source order, fills absent columns with `null`, and reports per-source imports. Set `columnStrategy: 'strict'` to require identical ordered columns. Existing `dropDuplicates()` remains available for later cleaning.
+## Display
 
-No Excel importer or third-party runtime dependency is included in v0.2.0; Excel remains deferred until a dependency-free or optional integration approach is chosen.
-
-### Display
-
-In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display a table whose row-index heading is `idx`. Also available: `dataset.toTable(options?)`, `dataset.display(options?)`, and `dataset.print(options?)`. Wide tables show up to 20 columns by default and indicate omitted columns; configure `maxColumns` to change the limit. Browser developer consoles do not necessarily honor Node's inspection hook; use `toTable()` or `display()` there.
+In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display an `idx` column. `dataset.toTable(options?)`, `display(options?)`, and `print(options?)` are also available. Tables display up to **100 rows by default**; configure `maxRows` to change this. Wide tables show up to 20 columns by default; configure `maxColumns` to change that limit. Browser developer consoles may not honor Node's inspection hook, so use `toTable()` or `display()` there.
 
 ## Scripts
 
@@ -127,8 +157,8 @@ In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display
 ## Development roadmap
 
 - `0.1.0` Foundation: dataset model, inspection, transformations, descriptive statistics, display, basic CSV/JSON.
-- `0.2.0` Data import and preparation: sample CSV/TSV/JSON data, robust CSV/JSON/TSV imports, URL/API and multi-source loading, validation/reports, missing values, type conversion, duplicate handling, profiling, and cleaning. Excel is deferred; no mandatory runtime dependencies are added.
-- `0.3.0` Advanced transformations: calculated columns, split/combine, date/time and text operations.
+- `0.2.0` Data import and preparation: sample CSV/TSV/JSON data, robust imports, URL/API and multi-source loading, validation/reports, missing values, conversion, duplicate handling, profiling, and cleaning. Excel deferred.
+- `0.3.0` Advanced transformations: calculated columns, split/combine, date/time and text operations, numeric rounding/outlier flags, and replayable pipelines.
 - `0.4.0` Query and filtering engine.
 - `0.5.0` Grouping and aggregation.
 - `0.6.0` Advanced statistics.

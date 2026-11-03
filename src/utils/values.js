@@ -1,4 +1,5 @@
 import { ValidationError } from '../errors/index.js';
+import { castTemporal, inferTemporalType, validateTemporalFormat } from './temporal.js';
 
 const DEFAULT_MISSING_VALUES = ['null', 'undefined', 'n/a', 'na'];
 const NUMERIC_PATTERN = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i;
@@ -29,6 +30,7 @@ export function normalizeValue(value, options = {}) {
 export function castValue(value, type, options = {}) {
   const target = normalizeTypeName(type);
   if (!target) throw new ValidationError(`Unsupported data type: ${type}`);
+  if (['date', 'datetime', 'time'].includes(target) && options.format !== undefined) validateTemporalFormat(options.format, target);
   const normalized = normalizeValue(value, { ...(options.normalization ?? {}), ...options, inferTypes: false });
   if (normalized === null) return null;
 
@@ -52,20 +54,9 @@ export function castValue(value, type, options = {}) {
     if (normalized === 0 || normalized === '0' || (typeof normalized === 'string' && normalized.trim().toLowerCase() === 'false')) return false;
     throw castError(value, type);
   }
-  if (target === 'date') {
-    if (normalized instanceof Date && !Number.isNaN(normalized.getTime())) return new Date(normalized);
-    if (typeof normalized !== 'string') throw castError(value, type);
-    const text = normalized.trim();
-    const dateOnly = /^\d{4}-\d{2}-\d{2}$/;
-    const timestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/i;
-    if (!dateOnly.test(text) && !timestamp.test(text)) throw castError(value, type);
-    const datePart = text.slice(0, 10);
-    const calendarDate = new Date(`${datePart}T00:00:00.000Z`);
-    if (Number.isNaN(calendarDate.getTime()) || calendarDate.toISOString().slice(0, 10) !== datePart) throw castError(value, type);
-    const date = new Date(text);
-    if (Number.isNaN(date.getTime())) throw castError(value, type);
-    if (dateOnly.test(text) && date.toISOString().slice(0, 10) !== text) throw castError(value, type);
-    return date;
+  if (['date', 'datetime', 'time'].includes(target)) {
+    try { return castTemporal(normalized, target, options.format); }
+    catch { throw castError(value, type); }
   }
   throw new ValidationError(`Unsupported data type: ${type}`);
 }
@@ -76,6 +67,8 @@ export function inferType(values) {
   if (present.every(value => typeof value === 'boolean')) return 'boolean';
   if (present.every(value => typeof value === 'number' && Number.isFinite(value))) return present.every(Number.isInteger) ? 'integer' : 'number';
   if (present.every(value => value instanceof Date && !Number.isNaN(value.getTime()))) return 'date';
+  const temporalType = inferTemporalType(present);
+  if (temporalType) return temporalType;
   if (present.every(value => typeof value === 'string')) return 'string';
   return 'mixed';
 }
@@ -93,7 +86,7 @@ function normalizeTypeName(type) {
   if (['number', 'float', 'decimal'].includes(name)) return 'number';
   if (['integer', 'int'].includes(name)) return 'integer';
   if (['boolean', 'bool'].includes(name)) return 'boolean';
-  if (name === 'date') return 'date';
+  if (['date', 'datetime', 'time'].includes(name)) return name;
   return null;
 }
 

@@ -70,7 +70,10 @@ test('useSampleDataset provides the same sample through CSV, TSV, and JSON', asy
   const defaultSample = await useSampleDataset();
   const tsv = await useSampleDataset('tsv');
   const json = await useSampleDataset({ format: 'json' });
-  assert.deepEqual(defaultSample.columns, ['customer', 'region', 'revenue']);
+  assert.deepEqual(defaultSample.columns, ['Transaction_ID', 'Date', 'Product', 'Category', 'Quantity', 'Total_Amount']);
+  assert.equal(defaultSample.length, 25);
+  assert.equal(defaultSample.rows[0].Transaction_ID, 1001);
+  assert.equal(defaultSample.rows.at(-1).Transaction_ID, 1025);
   assert.deepEqual(tsv.rows, defaultSample.rows);
   assert.deepEqual(json.rows, defaultSample.rows);
   assert.equal(defaultSample.importReport.source, 'sample:sales.csv');
@@ -112,16 +115,16 @@ test('explicit projectRoot resolves local files when the process cwd is elsewher
 });
 
 test('loadMany unions columns, reports per-source details, and can deduplicate across files', async () => {
-  const combined = await loadMany(['sales.csv', 'sales.csv'], { deduplicateBy: ['product'] });
-  assert.equal(combined.length, 3);
+  const combined = await loadMany(['sales.csv', 'sales.csv'], { deduplicateBy: ['Transaction_ID'] });
+  assert.equal(combined.length, 25);
   assert.equal(combined.importReport.sourceCount, 2);
-  assert.equal(combined.importReport.duplicatesRemoved, 3);
-  assert.equal(combined.importReport.rowsImported, 3);
+  assert.equal(combined.importReport.duplicatesRemoved, 25);
+  assert.equal(combined.importReport.rowsImported, 25);
   assert.equal(combined.importReport.sources.length, 2);
   await assert.rejects(loadMany(['sales.csv', 'people.json'], { columnStrategy: 'strict' }), /do not match/);
   const union = await loadMany(['sales.csv', 'people.json']);
-  assert.deepEqual(union.columns, ['product', 'price', 'quantity', 'name', 'active']);
-  assert.equal(union.length, 5);
+  assert.deepEqual(union.columns, ['Transaction_ID', 'Date', 'Product', 'Category', 'Quantity', 'Total_Amount', 'name', 'active']);
+  assert.equal(union.length, 27);
 });
 
 test('Dataset.profile reports missingness, distinct values, frequent categories, constants, and duplicate rows', () => {

@@ -1,13 +1,12 @@
-# Verification Record — v0.2.0
+# Verification Record — v0.3.0
 
-Environment: Node.js 22.16.0, npm 10.9.2.
-
-- `npm test`: PASS on the working source and an extracted ZIP copy — 28 tests, 28 passed, 0 failed.
-- `node --check` for every JavaScript module under `src/`: PASS.
-- `npm start`: PASS — the editable example ran with local CSV import, a bundled TSV sample, profiling, multi-source loading, and cleaning.
-- `npm run dev`: PASS for startup — Node watch mode reached its waiting-for-file-changes state. A save-triggered second run was not independently observed.
-- Public package-name exports: PASS — Dataset creation, CSV/JSON/generic/multi-source loading, and `useSampleDataset()` were exercised, including from the extracted ZIP.
-- `npm pack --dry-run`: PASS — CSV, TSV, and JSON bundled sample files are included.
-- ZIP validation: PASS — extraction produces `numeriq-v0.2.0/`; archive excludes `.git/` and `node_modules/`.
-- Coverage includes headerless and delimiter-detected CSV, skipped rows, schemas, custom missing markers, strict/lenient validation, JSON record/column inputs, API POST headers/body and content-type dispatch, explicit project roots, local path confinement, multi-source union/strict/deduplication, import reports, profiling, and immutable cleaning/type conversion.
-- No third-party runtime dependencies were added; Excel support is deferred.
+- `npm test`: PASS on source and extracted ZIP — 36 tests passed, 0 failed in each copy.
+- `node --check` for every JavaScript file under `src/`: PASS on source and extracted ZIP.
+- `npm start`: PASS on source and extracted ZIP — the example loaded the 25-row transaction data, ran a transformation pipeline, and printed its summary.
+- `npm run dev`: PASS for startup on source and extracted ZIP — Node watch mode reached its completed/ready state. A save-triggered rerun was not independently observed.
+- Public package imports: PASS for `numeriq` and `numeriq/pipeline`, including `createPipeline` and `TransformationPipeline`.
+- Sample parity: PASS — local and bundled CSV, TSV, and JSON sources each load the same 25 rows and six columns; the Date column infers as `date`.
+- `npm pack --dry-run`: PASS — 22 package files, including pipeline/temporal modules and bundled CSV/TSV/JSON samples; no runtime dependencies.
+- ZIP validation: PASS — `numeriq-v0.3.0.zip` extracts to `numeriq-v0.3.0/`, includes root and bundled sales files, and excludes `.git/` and `node_modules/`.
+- Regression coverage includes column restructuring, text and conditional transforms, rounding, IQR flags, all requested date parts, custom date/datetime/time formats in casts and CSV/JSON schemas, pipeline serialization/replay/summaries, and the 100-row default table limit.
+- Excel support remains deferred; no third-party runtime dependencies were added.

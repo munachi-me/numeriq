@@ -1,5 +1,26 @@
-customer,region,revenue
-Ada,North,1200
-Lin,South,850
-Mina,North,1200
-Noor,West,640
+Transaction_ID,Date,Product,Category,Quantity,Total_Amount
+1001,2026-01-05,Wireless Mouse,Electronics,3,74.97
+1002,2026-01-06,Mechanical Keyboard,Electronics,1,120.0
+1003,2026-01-08,Ergonomic Chair,Furniture,2,450.0
+1004,2026-01-09,Standing Desk,Furniture,1,550.0
+1005,2026-01-12,USB-C Cable Pack,Accessories,5,49.95
+1006,2026-01-14,27-inch Monitor,Electronics,2,600.0
+1007,2026-01-15,Noise-Canceling Headphones,Electronics,1,249.99
+1008,2026-01-18,Desk Lamp,Furniture,4,140.0
+1009,2026-01-20,Webcam HD,Electronics,2,150.0
+1010,2026-01-22,Laptop Stand,Accessories,3,119.85
+1011,2026-01-25,Bluetooth Speaker,Electronics,1,89.99
+1012,2026-01-27,External Hard Drive 2TB,Electronics,2,179.98
+1013,2026-01-28,Mouse Pad XL,Accessories,6,89.7
+1014,2026-02-01,Wireless Mouse,Electronics,2,49.98
+1015,2026-02-03,Ergonomic Chair,Furniture,1,225.0
+1016,2026-02-05,USB-C Hub,Accessories,3,134.97
+1017,2026-02-07,Mechanical Keyboard,Electronics,2,240.0
+1018,2026-02-10,Standing Desk,Furniture,2,1100.0
+1019,2026-02-12,Monitor Arm,Accessories,1,79.99
+1020,2026-02-15,Noise-Canceling Headphones,Electronics,2,499.98
+1021,2026-02-17,Desk Pad Leather,Accessories,4,139.96
+1022,2026-02-20,27-inch Monitor,Electronics,1,300.0
+1023,2026-02-22,Webcam HD,Electronics,1,75.0
+1024,2026-02-25,Desk Lamp,Furniture,2,70.0
+1025,2026-02-28,Wireless Earbuds,Electronics,3,389.97

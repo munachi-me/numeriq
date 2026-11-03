@@ -1,7 +1,8 @@
 const stringify = value => value === null || value === undefined ? 'NULL' : value instanceof Date ? value.toISOString() : typeof value === 'object' ? JSON.stringify(value) : String(value);
 
 export function renderTable(rows, columns, options = {}) {
-  const { maxRows = 20, maxColumns = 20, maxCellWidth = 28, showIndex = true, rowCount = rows.length, columnCount = columns.length } = options;
+  const { maxRows = 100, maxColumns = 20, maxCellWidth = 28, showIndex = true, rowCount = rows.length, columnCount = columns.length } = options;
+  if (!Number.isInteger(maxRows) || maxRows < 0) throw new RangeError('maxRows must be a non-negative integer.');
   if (!Number.isInteger(maxColumns) || maxColumns < 1) throw new RangeError('maxColumns must be a positive integer.');
   const visibleColumns = columns.slice(0, maxColumns);
   const omittedColumns = Math.max(0, columns.length - visibleColumns.length);

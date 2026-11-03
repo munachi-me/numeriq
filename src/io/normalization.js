@@ -20,13 +20,14 @@ export function importerNormalization(options = {}) {
 
 export function normalizeImportRecords(records, columns, options, warnings, format) {
   const schema = options.schema ?? {};
-  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) throw new ValidationError('schema must be an object mapping column names to types.');
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) throw new ValidationError('schema must map column names to types or { type, format } descriptors.');
   const unknownSchemaColumns = Object.keys(schema).filter(column => !columns.includes(column));
   if (unknownSchemaColumns.length) throw new ValidationError(`Schema references unknown column(s): ${unknownSchemaColumns.join(', ')}.`);
   const normalization = importerNormalization(options);
   const onInvalid = options.onInvalid ?? 'error';
   if (!['error', 'null'].includes(onInvalid)) throw new ValidationError("onInvalid must be 'error' or 'null'.");
-  for (const type of Object.values(schema)) castValue(null, type, { normalization });
+  const descriptors = Object.fromEntries(Object.entries(schema).map(([column, value]) => [column, normalizeSchemaEntry(value, column)]));
+  for (const descriptor of Object.values(descriptors)) castValue(null, descriptor.type, { normalization, format: descriptor.format });
 
   return records.map((record, rowIndex) => {
     const output = {};
@@ -36,22 +37,33 @@ export function normalizeImportRecords(records, columns, options, warnings, form
         output[column] = null;
         continue;
       }
-      if (schema[column] === undefined) {
+      if (descriptors[column] === undefined) {
         output[column] = normalizeValue(input, normalization);
         continue;
       }
+      const descriptor = descriptors[column];
       try {
-        output[column] = castValue(input, schema[column], { normalization });
+        output[column] = castValue(input, descriptor.type, { normalization, format: descriptor.format });
       } catch (error) {
         if (onInvalid === 'error') {
           throw new ValidationError(`${format} row ${rowIndex + 1}, column "${column}": ${error.message}`);
         }
         output[column] = null;
-        warnings.push(`${format} row ${rowIndex + 1}, column "${column}" was set to null because it could not be cast to ${schema[column]}.`);
+        warnings.push(`${format} row ${rowIndex + 1}, column "${column}" was set to null because it could not be cast to ${descriptor.type}.`);
       }
     }
     return output;
   });
+}
+
+function normalizeSchemaEntry(value, column) {
+  if (typeof value === 'string') return { type: value };
+  if (!value || typeof value !== 'object' || Array.isArray(value) || typeof value.type !== 'string') {
+    throw new ValidationError(`Schema entry for "${column}" must be a type string or an object with a type string.`);
+  }
+  const unknown = Object.keys(value).filter(key => !['type', 'format'].includes(key));
+  if (unknown.length) throw new ValidationError(`Unsupported schema option(s) for "${column}": ${unknown.join(', ')}.`);
+  return { type: value.type, ...(value.format === undefined ? {} : { format: value.format }) };
 }
 
 export function missingCounts(records, columns) {

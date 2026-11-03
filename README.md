@@ -2,7 +2,7 @@
 
 **JavaScript Data Science Engine** — a lightweight, framework-independent foundation for working with tabular data in JavaScript.
 
-> Version 0.3.0 adds dependency-free advanced transformations, temporal types, and replayable transformation pipelines. Numeriq remains an early development build, not yet a production-stability promise.
+> Version 0.4.0 adds a dependency-free declarative query engine on top of the v0.3.0 transformation and temporal APIs. Numeriq remains an early development build, not yet a production-stability promise.
 
 ## Requirements
 
@@ -103,11 +103,11 @@ const typed = data
 
 Supported format tokens are `YYYY`, `MM`/`M`, `MMM`/`MMMM`, `DD`/`D`, `HH`/`H`, `hh`/`h` with `A` for AM/PM, `mm`/`m`, `ss`/`s`, `SSS`, and `Z` for a datetime timezone offset. For datetime formats without `Z`, input is interpreted as UTC. Cast date values are JavaScript `Date` objects at UTC midnight; datetime values are canonical ISO strings in UTC; time values are canonical `HH:mm:ss.SSS` strings. Import schemas can use the same per-column descriptor, for example `{ schema: { day: { type: 'date', format: 'DD/MM/YYYY' } } }`.
 
-`extractDatePart(column, part, { as? })` accepts a `date` or `datetime` column and appends a new column. Parts are `day`, `weekday`, `week`, `month`, `monthName`, `quarter`, and `year`. Week and weekday use ISO-8601 rules: Monday is weekday 1, Sunday is 7, and week 1 is the week containing the year's first Thursday. Month names are English. Extraction uses UTC consistently; missing values remain `null`. The default output name is `${column}_${part}`.
+`extractDatePart(column, part, { as?, nameLength? })` accepts a `date` or `datetime` column and appends a new column. Parts are `day`, `weekday`, `week`, `month`, `monthName`, `quarter`, and `year`. `weekday` now returns an English name such as `Monday` (not an ISO weekday number); `monthName` returns a name such as `January`. Set `nameLength: 'short'` for `Mon` / `Jan`, or `'long'` (the default) for `Monday` / `January`. Week number uses ISO-8601 rules, where week 1 contains the year's first Thursday. Extraction uses UTC consistently; missing values remain `null`. The default output name is `${column}_${part}`.
 
 ### Replayable pipelines and transformation summaries
 
-Create a declarative pipeline from JSON-safe operation descriptors. `run(dataset)` returns `{ dataset, summary }`; each summary step includes shapes, rows added/removed, and columns added/removed. Pipelines can be serialized with `JSON.stringify(pipeline)` and restored with `TransformationPipeline.fromJSON()` or `createPipeline(document)`.
+Create a declarative pipeline from JSON-safe operation descriptors. `run(dataset)` returns `{ dataset, summary }`; each summary step includes shapes, rows added/removed, and columns added/removed. Pipelines can be serialized with `JSON.stringify(pipeline)` and restored with `TransformationPipeline.fromJSON()` or `createPipeline(document)`. v0.4.0 pipelines can include a `query` step; queries and pipelines use the same JSON-safe condition format.
 
 ```js
 const pipeline = createPipeline([
@@ -123,6 +123,28 @@ const { dataset: result, summary } = pipeline.run(data);
 ```
 
 Pipeline steps do not accept callbacks, so a serialized pipeline is replayable. `addColumn` and `updateColumnWhere` support JSON-safe expression trees. Expression operations include arithmetic (`add`, `subtract`, `multiply`, `divide`), comparisons (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`), boolean operations (`and`, `or`, `not`), `if`, `coalesce`, and `concat`. Column references use `{ column: 'name' }`; constants use `{ literal: value }`.
+
+## Query and filtering (v0.4.0)
+
+Build a reusable declarative query with `createQuery(document)` or `new Query(document)`. `query.run(dataset)` returns a new Dataset; serialize it with `JSON.stringify(query)` and restore it with `Query.fromJSON(document)`.
+
+```js
+const query = createQuery({
+  where: { op: 'and', args: [
+    { op: 'eq', column: 'Category', value: 'Electronics' },
+    { op: 'gte', column: 'Total_Amount', value: 100 }
+  ] },
+  orderBy: [{ column: 'Total_Amount', direction: 'desc' }],
+  select: ['Date', 'Product', 'Total_Amount'],
+  offset: 0,
+  limit: 10
+});
+const result = query.run(sales);
+```
+
+Comparison operators are `eq`, `ne`, `gt`, `gte`, `lt`, and `lte`; set membership uses `in` / `notIn`; literal string matching uses `contains`, `startsWith`, and `endsWith` with optional `caseSensitive: false`. Explicit missing-value tests use `isNull` / `isNotNull`; comparisons against missing values never match, and use of `eq`/`ne` with `null` is rejected. `and`, `or`, and `not` compose nested conditions. Incompatible comparison types do not match. ISO date/datetime values compare as instants.
+
+`orderBy` accepts multiple `{ column, direction }` keys, defaults to ascending, preserves input order for ties, and places missing values last in either direction. `offset`, `limit`, and `select` provide pagination and projection. Query descriptors validate operators, options, and column references; they accept no callbacks, regex execution, or query-string evaluation. This release does not include grouping or aggregation; those remain planned for v0.5.0.
 
 ## Statistics
 
@@ -159,7 +181,7 @@ In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display
 - `0.1.0` Foundation: dataset model, inspection, transformations, descriptive statistics, display, basic CSV/JSON.
 - `0.2.0` Data import and preparation: sample CSV/TSV/JSON data, robust imports, URL/API and multi-source loading, validation/reports, missing values, conversion, duplicate handling, profiling, and cleaning. Excel deferred.
 - `0.3.0` Advanced transformations: calculated columns, split/combine, date/time and text operations, numeric rounding/outlier flags, and replayable pipelines.
-- `0.4.0` Query and filtering engine.
+- `0.4.0` Query and filtering engine: nested declarative filters, null/membership/string predicates, multi-key stable sorting, projection, pagination, JSON serialization/replay, and pipeline query steps. Weekday/month extraction supports short and long English names.
 - `0.5.0` Grouping and aggregation.
 - `0.6.0` Advanced statistics.
 - `0.7.0` Metrics and KPIs.

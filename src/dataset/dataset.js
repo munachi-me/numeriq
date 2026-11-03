@@ -127,7 +127,7 @@ export class Dataset {
     return this.#new(rows, columns);
   }
   filter(predicate) { if (typeof predicate!=='function') throw new ValidationError('filter expects a predicate function.'); return this.#new(this.#rows.filter((r,i)=>predicate({...r},i))); }
-  sortBy(column,direction='asc') { this.#assertColumn(column); if (!['asc','desc'].includes(direction)) throw new ValidationError("direction must be 'asc' or 'desc'."); const factor=direction==='asc'?1:-1; const rows=this.rows.sort((a,b)=>{const x=a[column],y=b[column]; if(x==null)return 1;if(y==null)return -1; return (x>y?1:x<y?-1:0)*factor;}); return this.#new(rows); }
+  sortBy(column,direction='asc') { this.#assertColumn(column); if (!['asc','desc'].includes(direction)) throw new ValidationError("direction must be 'asc' or 'desc'."); const factor=direction==='asc'?1:-1; const rows=this.#rows.map((row,index)=>({row,index})).sort((a,b)=>{const x=a.row[column],y=b.row[column]; if(x==null&&y==null)return a.index-b.index;if(x==null)return 1;if(y==null)return -1; const tx=temporalTimestamp(x),ty=temporalTimestamp(y); if(tx!==null&&ty!==null)return (tx<ty?-1:tx>ty?1:0)*factor||a.index-b.index; return (x>y?1:x<y?-1:0)*factor||a.index-b.index;}).map(item=>item.row); return this.#new(rows); }
   limit(count) { return this.head(count); }
   addColumn(name,valueOrFunction) { const target=validColumnName(name); if(this.#columns.includes(target)) throw new ValidationError(`Invalid or existing column: ${target}`); const cols=[...this.#columns,target]; const rows=this.#rows.map((r,i)=>({...r,[target]:typeof valueOrFunction==='function'?normalizeValue(valueOrFunction({...r},i),this.#options.normalization):normalizeValue(valueOrFunction,this.#options.normalization)})); return this.#new(rows,cols); }
   mapRows(mapper) { if(typeof mapper!=='function') throw new ValidationError('mapRows expects a function.'); const rows=this.#rows.map((r,i)=>mapper({...r},i)); return new Dataset(rows,{...this.#options,name:this.name}); }
@@ -286,7 +286,7 @@ export class Dataset {
     if (!['date', 'datetime'].includes(this.dtypes[column])) throw new ValidationError(`extractDatePart requires a date or datetime column; cast "${column}" first.`);
     const target = validColumnName(options.as ?? `${column}_${part}`);
     if (this.#columns.includes(target)) throw new ValidationError(`Date-part output column already exists: ${target}`);
-    const rows = this.#rows.map(row => ({ ...row, [target]: row[column] == null ? null : getDatePart(row[column], part) }));
+    const rows = this.#rows.map(row => ({ ...row, [target]: row[column] == null ? null : getDatePart(row[column], part, options) }));
     return this.#new(rows, [...this.#columns, target]);
   }
   castColumn(column, type, options = {}) {
@@ -328,6 +328,13 @@ function validColumnName(name) {
   return name.trim();
 }
 function escapeRegExp(value) { return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function temporalTimestamp(value) {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.getTime();
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(value)) return null;
+  const text = value.length === 10 ? `${value}T00:00:00.000Z` : value;
+  const timestamp = Date.parse(text);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
 function titleCase(value) { return value.toLocaleLowerCase('en-US').replace(/(^|[\s_-])(\p{L})/gu, (_, separator, letter) => `${separator}${letter.toLocaleUpperCase('en-US')}`); }
 function quantile(sorted, probability) {
   const position = (sorted.length - 1) * probability;

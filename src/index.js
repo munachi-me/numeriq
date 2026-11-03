@@ -1,5 +1,6 @@
 export { Dataset, createDataset } from './dataset/dataset.js';
 export { TransformationPipeline, createPipeline } from './dataset/pipeline.js';
+export { Query, createQuery } from './dataset/query.js';
 export { Series } from './dataset/series.js';
 export { parseCSV, parseJSON } from './io/index.js';
 export { loadCSV, loadJSON, loadData, loadMany, useSampleDataset } from './io/index.js';

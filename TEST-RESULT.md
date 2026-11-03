@@ -1,12 +1,13 @@
-# Verification Record — v0.3.0
+# Verification Record — v0.4.0
 
-- `npm test`: PASS on source and extracted ZIP — 36 tests passed, 0 failed in each copy.
+- `npm test`: PASS on source and a fresh extraction of the ZIP — 43 tests passed, 0 failed in each copy.
 - `node --check` for every JavaScript file under `src/`: PASS on source and extracted ZIP.
-- `npm start`: PASS on source and extracted ZIP — the example loaded the 25-row transaction data, ran a transformation pipeline, and printed its summary.
+- `npm start`: PASS on source and extracted ZIP — the example imports sample sales data, extracts short weekday names, executes a query inside a serializable transformation pipeline, and prints query results and summaries.
 - `npm run dev`: PASS for startup on source and extracted ZIP — Node watch mode reached its completed/ready state. A save-triggered rerun was not independently observed.
-- Public package imports: PASS for `numeriq` and `numeriq/pipeline`, including `createPipeline` and `TransformationPipeline`.
-- Sample parity: PASS — local and bundled CSV, TSV, and JSON sources each load the same 25 rows and six columns; the Date column infers as `date`.
-- `npm pack --dry-run`: PASS — 22 package files, including pipeline/temporal modules and bundled CSV/TSV/JSON samples; no runtime dependencies.
-- ZIP validation: PASS — `numeriq-v0.3.0.zip` extracts to `numeriq-v0.3.0/`, includes root and bundled sales files, and excludes `.git/` and `node_modules/`.
-- Regression coverage includes column restructuring, text and conditional transforms, rounding, IQR flags, all requested date parts, custom date/datetime/time formats in casts and CSV/JSON schemas, pipeline serialization/replay/summaries, and the 100-row default table limit.
-- Excel support remains deferred; no third-party runtime dependencies were added.
+- Public imports: PASS for `numeriq` and `numeriq/query`, including `createQuery`, `Query.fromJSON`, and query replay.
+- Query tests cover nested boolean filters; comparisons, set membership, explicit null, and literal string operators; stable multi-key sorting with nulls last; projection and pagination; JSON round-trips; invalid operators/columns/options; ISO date/datetime comparison and timezone-aware ordering; and query pipeline replay.
+- Temporal names: PASS — `weekday` returns English weekday names, and weekday/month names support `nameLength: 'short' | 'long'` (long by default).
+- Sample parity: PASS — local CSV/JSON and bundled CSV/TSV/JSON continue to load the same 25 transaction rows.
+- `npm pack --dry-run`: PASS — 23 package files include the query module/subpath and no runtime dependencies.
+- ZIP validation: PASS — archive extracts to `numeriq-v0.4.0/`, contains the query module, excludes `.git/` and `node_modules/`, and passes the full test, syntax, example, export, and watch-startup checks from extraction.
+- Grouping and aggregation remain planned for v0.5.0; no third-party runtime dependencies were added.

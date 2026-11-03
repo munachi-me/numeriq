@@ -12,6 +12,9 @@ const TOKEN_SPECS = [
   ['Z', 'zone', '(?:Z|[+-](?:[01]\\d|2[0-3]):?[0-5]\\d)']
 ];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const FORMAT_CACHE = new Map();
 const DAY_MS = 86_400_000;
 
@@ -64,18 +67,20 @@ export function castTemporal(value, type, format) {
   throw new ValidationError(`Unsupported temporal type: ${type}`);
 }
 
-export function extractDatePart(value, part) {
+export function extractDatePart(value, part, options = {}) {
   const date = value instanceof Date ? new Date(value) : parseIsoDateForExtraction(value);
   if (Number.isNaN(date.getTime())) throw new RangeError('Invalid date value.');
+  const nameLength = options.nameLength ?? 'long';
+  if (!['short', 'long'].includes(nameLength)) throw new ValidationError("nameLength must be 'short' or 'long'.");
   const year = date.getUTCFullYear();
   const month = date.getUTCMonth() + 1;
   const day = date.getUTCDate();
   switch (part) {
     case 'day': return day;
-    case 'weekday': return date.getUTCDay() || 7; // ISO weekday: Monday=1 through Sunday=7.
+    case 'weekday': return (nameLength === 'short' ? WEEKDAYS_SHORT : WEEKDAYS)[date.getUTCDay()];
     case 'week': return isoWeek(date);
     case 'month': return month;
-    case 'monthName': return MONTHS[month - 1];
+    case 'monthName': return (nameLength === 'short' ? MONTHS_SHORT : MONTHS)[month - 1];
     case 'quarter': return Math.ceil(month / 3);
     case 'year': return year;
     default: throw new ValidationError(`Unsupported date part "${part}". Choose day, weekday, week, month, monthName, quarter, or year.`);

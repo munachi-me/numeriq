@@ -1,11 +1,12 @@
 import { ValidationError } from '../errors/index.js';
 import { Dataset } from './dataset.js';
+import { createQuery } from './query.js';
 
 const PIPELINE_VERSION = 1;
 const SUPPORTED_OPERATIONS = new Set([
   'select', 'reorderColumns', 'dropColumns', 'renameColumn', 'renameColumns', 'splitColumn', 'combineColumns',
   'replaceText', 'trimColumn', 'changeCase', 'updateColumnWhere', 'addColumn', 'roundColumn', 'extractDatePart',
-  'flagOutliers', 'dropMissing', 'fillMissing', 'castColumn', 'dropDuplicates'
+  'flagOutliers', 'dropMissing', 'fillMissing', 'castColumn', 'dropDuplicates', 'query'
 ]);
 
 export class TransformationPipeline {
@@ -115,6 +116,10 @@ function applyStep(dataset, step) {
     }
     case 'castColumn': return dataset.castColumn(step.column, step.type, step.options);
     case 'dropDuplicates': return dataset.dropDuplicates(...(step.columns === undefined ? [] : requireColumns(step.columns, step.op)));
+    case 'query': {
+      if (!Object.hasOwn(step, 'query')) throw new ValidationError('query pipeline steps require a query document.');
+      return createQuery(step.query).run(dataset);
+    }
     default: throw new ValidationError(`Unsupported pipeline operation: ${step.op}`);
   }
 }

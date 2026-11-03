@@ -73,19 +73,24 @@ test('date, datetime, and time support explicit formats and deterministic part e
   const parts = typed
     .extractDatePart('Day', 'day')
     .extractDatePart('Day', 'weekday', { as: 'weekday' })
+    .extractDatePart('Day', 'weekday', { as: 'weekday_short', nameLength: 'short' })
     .extractDatePart('Day', 'week', { as: 'week' })
     .extractDatePart('Day', 'month')
     .extractDatePart('Day', 'monthName', { as: 'month_name' })
+    .extractDatePart('Day', 'monthName', { as: 'month_short', nameLength: 'short' })
     .extractDatePart('Day', 'quarter', { as: 'quarter' })
     .extractDatePart('Started', 'year', { as: 'started_year' });
-  assert.equal(parts.rows[0].weekday, 2); // ISO weekday: Tuesday = 2.
+  assert.equal(parts.rows[0].weekday, 'Tuesday');
+  assert.equal(parts.rows[0].weekday_short, 'Tue');
   assert.equal(parts.rows[0].Day_day, 31);
   assert.equal(parts.rows[0].week, 1);
   assert.equal(parts.rows[0].Day_month, 12);
   assert.equal(parts.rows[0].month_name, 'December');
+  assert.equal(parts.rows[0].month_short, 'Dec');
   assert.equal(parts.rows[0].quarter, 4);
   assert.equal(parts.rows[0].started_year, 2024);
   assert.throws(() => typed.extractDatePart('Clock', 'hour'), ValidationError);
+  assert.throws(() => typed.extractDatePart('Day', 'weekday', { nameLength: 'tiny' }), /nameLength/);
   assert.throws(() => source.castColumn('Day', 'date', { format: 'HH:mm' }), /date format/);
 });
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 — Query and filtering engine
+
+- Added a JSON-serializable query API with nested `and`/`or`/`not`, comparisons, membership, explicit null checks, and literal string predicates.
+- Added multi-column stable ordering, null-last sorting, projection, offset, and limit; query conditions are validated and replayable.
+- Added query operations to transformation pipelines without callbacks or dynamic evaluation.
+- Changed date-part `weekday` extraction to return English day names and added short/long name selection for weekdays and months.
+- Kept grouping and aggregation for v0.5.0; no third-party runtime dependencies were added.
+
 ## 0.3.0 — Advanced transformations
 
 - Added immutable column reordering, multi-column renaming, splitting/combining, text replacement, trimming, case conversion, and conditional updates.

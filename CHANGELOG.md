@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0 — Grouping, aggregation, and column creation
+
+- Added stable multi-key and global grouping with count, distinct count, sum, mean, median, min/max, range, variance, and standard deviation aggregations.
+- Added descriptive default aggregate labels (for example, `sum of prices`) and caller-selected output names through `name`, `as`, `alias`, or object-key mapping.
+- Added immutable expression-based calculated columns, query-predicate conditional columns, and ordered multi-case columns.
+- Added replayable pipeline steps for calculated, conditional, case, and grouped aggregate operations.
+- Retained null grouping keys and explicit numeric/missing semantics; no runtime dependencies were added.
+
 ## 0.4.0 — Query and filtering engine
 
 - Added a JSON-serializable query API with nested `and`/`or`/`not`, comparisons, membership, explicit null checks, and literal string predicates.

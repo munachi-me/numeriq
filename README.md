@@ -2,7 +2,7 @@
 
 **JavaScript Data Science Engine** — a lightweight, framework-independent foundation for working with tabular data in JavaScript.
 
-> Version 0.4.0 adds a dependency-free declarative query engine on top of the v0.3.0 transformation and temporal APIs. Numeriq remains an early development build, not yet a production-stability promise.
+> Version 0.5.0 adds dependency-free grouping and aggregation, formula-based calculated columns, conditional/case columns, and replayable pipeline support. Numeriq remains an early development build, not yet a production-stability promise.
 
 ## Requirements
 
@@ -28,8 +28,17 @@ import { loadCSV, createPipeline } from './src/index.js';
 const sales = await loadCSV('sales.csv'); // local files are read from dataset/
 const pipeline = createPipeline([
   { op: 'extractDatePart', column: 'Date', part: 'monthName', options: { as: 'Month' } },
-  { op: 'roundColumn', column: 'Total_Amount', precision: 2 },
-  { op: 'flagOutliers', column: 'Total_Amount', options: { as: 'Amount_Outlier' } }
+  { op: 'addCalculatedColumn', name: 'Unit_Price', expression: {
+      op: 'divide', args: [{ column: 'Total_Amount' }, { column: 'Quantity' }]
+  } },
+  { op: 'addConditionalColumn', name: 'Order_Size',
+    condition: { op: 'gte', column: 'Total_Amount', value: 300 },
+    then: { literal: 'large' }, else: { literal: 'standard' } },
+  { op: 'groupBy', columns: ['Category', 'Month'], aggregations: [
+    { op: 'countRows' },
+    { op: 'sum', column: 'Total_Amount', as: 'revenue' },
+    { op: 'mean', column: 'Total_Amount', name: 'average order value' }
+  ] }
 ]);
 
 const { dataset, summary } = pipeline.run(sales);
@@ -79,6 +88,8 @@ All Dataset transformations are immutable: they return a new Dataset and leave t
 - `changeCase(column, 'lower' | 'upper' | 'title')`
 - `updateColumnWhere(column, predicate, valueOrFunction)`
 - `addColumn(name, valueOrFunction)`, `mapRows(mapper)`
+- `addCalculatedColumn(name, expression)` for safe JSON-based formulas
+- `addConditionalColumn(name, condition, thenValue, elseValue)` and `addCaseColumn(name, cases, defaultValue?)`
 
 `splitColumn` replaces the source column by default, puts any remaining split pieces into the last output column, and trims each piece. Set `dropOriginal: false` to retain the source. `combineColumns` keeps its sources by default, skips missing values, and appends the new column; set `dropSource: true` to replace the source columns. Text search is a literal string, not a regular expression. Replacement is global and case-sensitive by default. Non-string values are left unchanged by text operations.
 
@@ -89,6 +100,8 @@ All Dataset transformations are immutable: they return a new Dataset and leave t
 - Existing helpers include `filter(predicate)`, `sortBy(column, direction?)`, `limit(count)`, `dropDuplicates(...columns)`, `unique(column)`, `nunique(column)`, `dropMissing({ columns?, how? })`, and `fillMissing(column, valueOrFunction)`.
 
 `addColumn` accepts either a literal or a callback `(row, index) => value`. `updateColumnWhere` takes a predicate `(row, index) => boolean` and a literal or replacement callback.
+
+`addCalculatedColumn` creates a column from the replayable expression language (for example, multiply `{ column: 'price' }` by `{ column: 'quantity' }`). `addConditionalColumn` uses the same JSON condition descriptors as v0.4 queries and chooses between literal values or expressions. `addCaseColumn` evaluates ordered `{ when, then }` rules and uses a fallback value/expression; the first matching rule wins. These methods return new datasets and do not change the source.
 
 ### Date, datetime, and time
 
@@ -122,7 +135,7 @@ const pipeline = createPipeline([
 const { dataset: result, summary } = pipeline.run(data);
 ```
 
-Pipeline steps do not accept callbacks, so a serialized pipeline is replayable. `addColumn` and `updateColumnWhere` support JSON-safe expression trees. Expression operations include arithmetic (`add`, `subtract`, `multiply`, `divide`), comparisons (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`), boolean operations (`and`, `or`, `not`), `if`, `coalesce`, and `concat`. Column references use `{ column: 'name' }`; constants use `{ literal: value }`.
+Pipeline steps do not accept callbacks, so a serialized pipeline is replayable. `addColumn`, `addCalculatedColumn`, `addConditionalColumn`, and `addCaseColumn` support JSON-safe expressions; `groupBy` materializes grouped aggregates. Expression operations include arithmetic (`add`, `subtract`, `multiply`, `divide`), comparisons (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`), boolean operations (`and`, `or`, `not`), null checks, membership and literal string predicates, `if`, `coalesce`, and `concat`. Column references use `{ column: 'name' }`; constants use `{ literal: value }`.
 
 ## Query and filtering (v0.4.0)
 
@@ -144,7 +157,28 @@ const result = query.run(sales);
 
 Comparison operators are `eq`, `ne`, `gt`, `gte`, `lt`, and `lte`; set membership uses `in` / `notIn`; literal string matching uses `contains`, `startsWith`, and `endsWith` with optional `caseSensitive: false`. Explicit missing-value tests use `isNull` / `isNotNull`; comparisons against missing values never match, and use of `eq`/`ne` with `null` is rejected. `and`, `or`, and `not` compose nested conditions. Incompatible comparison types do not match. ISO date/datetime values compare as instants.
 
-`orderBy` accepts multiple `{ column, direction }` keys, defaults to ascending, preserves input order for ties, and places missing values last in either direction. `offset`, `limit`, and `select` provide pagination and projection. Query descriptors validate operators, options, and column references; they accept no callbacks, regex execution, or query-string evaluation. This release does not include grouping or aggregation; those remain planned for v0.5.0.
+`orderBy` accepts multiple `{ column, direction }` keys, defaults to ascending, preserves input order for ties, and places missing values last in either direction. `offset`, `limit`, and `select` provide pagination and projection. Query descriptors validate operators, options, and column references; they accept no callbacks, regex execution, or query-string evaluation.
+
+## Grouping and aggregation (v0.5.0)
+
+`groupBy(...columns)` (or `groupBy(['year', 'month'])`) returns a grouped view. Call `.agg(descriptors)` or `.aggregate(descriptors)` to create a regular Dataset of summary rows. Group keys appear first in the output; groups retain the order in which each key combination first appeared.
+
+```js
+const byCategory = sales
+  .groupBy('Category')
+  .agg([
+    { op: 'countRows' },
+    { op: 'sum', column: 'Total_Amount', as: 'revenue' },
+    { op: 'mean', column: 'Total_Amount', name: 'average order value' },
+    { op: 'nunique', column: 'Product' }
+  ]);
+```
+
+Supported operations are `countRows`, `count`, `nunique`, `sum`, `mean`, `median`, `min`, `max`, `range`, `variance`, and `std`. Aggregations that use a column ignore missing values; numeric statistics use finite numeric values, and `count` counts non-missing values. Variance and standard deviation default to population calculations (`ddof: 0`); pass `ddof: 1` for sample calculations. `countRows` counts all rows in a group.
+
+If an aggregation has no explicit output label, Numeriq creates a readable default such as `sum of prices`, `count of rows`, or `distinct count of product`. In array descriptors, set `name`, `as`, or `alias` to choose the displayed result column. An object form also maps output names to descriptors: `agg({ revenue: { op: 'sum', column: 'price' } })`. Output names must be unique and cannot collide with grouping keys.
+
+Missing group-key values are retained as a single null-key group. Grouping is multi-key and type-aware. Calling `groupBy()` with no keys requests a global aggregate; an empty source yields zero for `countRows` and `sum`, and `null` for statistics that need observations. Empty keyed results retain the requested output schema. Filter with `createQuery()` before grouping and query the resulting summary Dataset afterward. Grouping does not yet include pivot tables, joins, rollups, or aggregate-result `HAVING` filters.
 
 ## Statistics
 
@@ -182,7 +216,7 @@ In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display
 - `0.2.0` Data import and preparation: sample CSV/TSV/JSON data, robust imports, URL/API and multi-source loading, validation/reports, missing values, conversion, duplicate handling, profiling, and cleaning. Excel deferred.
 - `0.3.0` Advanced transformations: calculated columns, split/combine, date/time and text operations, numeric rounding/outlier flags, and replayable pipelines.
 - `0.4.0` Query and filtering engine: nested declarative filters, null/membership/string predicates, multi-key stable sorting, projection, pagination, JSON serialization/replay, and pipeline query steps. Weekday/month extraction supports short and long English names.
-- `0.5.0` Grouping and aggregation.
+- `0.5.0` Grouping and aggregation: stable multi-key grouping, descriptive aggregates with configurable output labels, global summaries, calculated columns, conditional/case columns, and replayable pipeline steps.
 - `0.6.0` Advanced statistics.
 - `0.7.0` Metrics and KPIs.
 - `0.8.0` Data intelligence and explainable insights.

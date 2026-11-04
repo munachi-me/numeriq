@@ -49,6 +49,32 @@ const lowValueQuery = createQuery({
 });
 console.log('REUSABLE QUERY:', lowValueQuery.run(sales));
 
+const salesSummaryPipeline = createPipeline([
+  { op: 'extractDatePart', column: 'Date', part: 'year', options: { as: 'Year' } },
+  { op: 'extractDatePart', column: 'Date', part: 'month', options: { as: 'Month' } },
+  { op: 'addCalculatedColumn', name: 'Unit_Price', expression: {
+    op: 'divide', args: [{ column: 'Total_Amount' }, { column: 'Quantity' }]
+  } },
+  { op: 'addConditionalColumn', name: 'Order_Size',
+    condition: { op: 'gte', column: 'Total_Amount', value: 300 },
+    then: { literal: 'large' }, else: { literal: 'standard' } },
+  { op: 'addCaseColumn', name: 'Price_Band', cases: [
+    { when: { op: 'gte', column: 'Unit_Price', value: 200 }, then: { literal: 'premium' } },
+    { when: { op: 'gte', column: 'Unit_Price', value: 50 }, then: { literal: 'mid-range' } }
+  ], default: { literal: 'value' } },
+  { op: 'groupBy', columns: ['Year', 'Month', 'Category'], aggregations: [
+    { op: 'countRows' },
+    { op: 'sum', column: 'Total_Amount', as: 'Revenue' },
+    { op: 'mean', column: 'Total_Amount', name: 'Average Order Value' },
+    { op: 'nunique', column: 'Product' }
+  ] }
+]);
+const { dataset: monthlySales, summary: salesSummary } = salesSummaryPipeline.run(sales);
+console.log('MONTHLY SALES BY CATEGORY (V0.5 GROUPING)');
+console.log(monthlySales);
+console.log('V0.5 COLUMN + AGGREGATION PIPELINE SUMMARY:', salesSummary);
+console.log('SERIALIZED SALES SUMMARY PIPELINE:', JSON.stringify(salesSummaryPipeline));
+
 const raw = createDataset([
   { customer: 'Ada', visits: '3', region: 'North' },
   { customer: 'Lin', visits: null, region: 'South' },

@@ -1,6 +1,6 @@
 {
   "name": "numeriq",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "A lightweight JavaScript data science engine.",
   "type": "module",
   "main": "./src/index.js",
@@ -9,6 +9,7 @@
     "./dataset": "./src/dataset/dataset.js",
     "./pipeline": "./src/dataset/pipeline.js",
     "./query": "./src/dataset/query.js",
+    "./grouping": "./src/dataset/grouping.js",
     "./display": "./src/display/table.js",
     "./stats": "./src/stats/descriptive.js",
     "./io": "./src/io/index.js"

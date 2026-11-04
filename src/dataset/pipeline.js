@@ -1,12 +1,14 @@
 import { ValidationError } from '../errors/index.js';
 import { Dataset } from './dataset.js';
 import { createQuery } from './query.js';
+import { evaluateExpression } from './expressions.js';
 
 const PIPELINE_VERSION = 1;
 const SUPPORTED_OPERATIONS = new Set([
   'select', 'reorderColumns', 'dropColumns', 'renameColumn', 'renameColumns', 'splitColumn', 'combineColumns',
   'replaceText', 'trimColumn', 'changeCase', 'updateColumnWhere', 'addColumn', 'roundColumn', 'extractDatePart',
-  'flagOutliers', 'dropMissing', 'fillMissing', 'castColumn', 'dropDuplicates', 'query'
+  'flagOutliers', 'dropMissing', 'fillMissing', 'castColumn', 'dropDuplicates', 'query',
+  'addCalculatedColumn', 'addConditionalColumn', 'addCaseColumn', 'groupBy'
 ]);
 
 export class TransformationPipeline {
@@ -103,6 +105,20 @@ function applyStep(dataset, step) {
       if (Object.hasOwn(step, 'value')) return dataset.addColumn(step.name, step.value);
       throw new ValidationError('addColumn requires a JSON-safe value or expression.');
     }
+    case 'addCalculatedColumn': {
+      if (!Object.hasOwn(step, 'expression')) throw new ValidationError('addCalculatedColumn requires an expression.');
+      return dataset.addCalculatedColumn(step.name, step.expression);
+    }
+    case 'addConditionalColumn': {
+      if (!Object.hasOwn(step, 'condition') || !Object.hasOwn(step, 'then') || !Object.hasOwn(step, 'else')) {
+        throw new ValidationError('addConditionalColumn requires condition, then, and else.');
+      }
+      return dataset.addConditionalColumn(step.name, step.condition, step.then, step.else);
+    }
+    case 'addCaseColumn': {
+      if (!Object.hasOwn(step, 'cases')) throw new ValidationError('addCaseColumn requires cases.');
+      return dataset.addCaseColumn(step.name, step.cases, step.default ?? null);
+    }
     case 'roundColumn': return dataset.roundColumn(step.column, step.precision ?? 0);
     case 'extractDatePart': return dataset.extractDatePart(step.column, step.part, step.options);
     case 'flagOutliers': return dataset.flagOutliers(step.column, step.options);
@@ -120,61 +136,14 @@ function applyStep(dataset, step) {
       if (!Object.hasOwn(step, 'query')) throw new ValidationError('query pipeline steps require a query document.');
       return createQuery(step.query).run(dataset);
     }
+    case 'groupBy': {
+      if (!Object.hasOwn(step, 'aggregations')) throw new ValidationError('groupBy pipeline steps require aggregations.');
+      return dataset.groupBy(step.columns ?? []).agg(step.aggregations);
+    }
     default: throw new ValidationError(`Unsupported pipeline operation: ${step.op}`);
   }
 }
 
-function evaluateExpression(expression, row) {
-  if (expression === null || typeof expression === 'string' || typeof expression === 'number' || typeof expression === 'boolean') return expression;
-  if (!isRecord(expression)) throw new ValidationError('Pipeline expressions must be JSON values or expression objects.');
-  if (Object.hasOwn(expression, 'column')) {
-    if (typeof expression.column !== 'string' || !Object.hasOwn(row, expression.column)) throw new ValidationError(`Expression references unknown column: ${expression.column}`);
-    return row[expression.column];
-  }
-  if (Object.hasOwn(expression, 'literal')) return expression.literal;
-  const operation = expression.op;
-  const args = expression.args;
-  if (typeof operation !== 'string' || !Array.isArray(args)) throw new ValidationError('Expression objects require op and args fields.');
-  const values = args.map(argument => evaluateExpression(argument, row));
-  switch (operation) {
-    case 'add': return arithmetic(values, (a, b) => a + b, operation);
-    case 'subtract': return arithmetic(values, (a, b) => a - b, operation);
-    case 'multiply': return arithmetic(values, (a, b) => a * b, operation);
-    case 'divide': return arithmetic(values, (a, b) => b === 0 ? null : a / b, operation);
-    case 'concat': {
-      const separator = expression.separator ?? '';
-      if (typeof separator !== 'string') throw new ValidationError('concat separator must be a string.');
-      const includeMissing = expression.includeMissing ?? false;
-      const pieces = values.filter(value => includeMissing || value !== null && value !== undefined).map(value => value == null ? '' : String(value));
-      return pieces.length ? pieces.join(separator) : null;
-    }
-    case 'coalesce': return values.find(value => value !== null && value !== undefined) ?? null;
-    case 'eq': return values.length === 2 && values[0] === values[1];
-    case 'ne': return values.length === 2 && values[0] !== values[1];
-    case 'gt': return compare(values, (a, b) => a > b);
-    case 'gte': return compare(values, (a, b) => a >= b);
-    case 'lt': return compare(values, (a, b) => a < b);
-    case 'lte': return compare(values, (a, b) => a <= b);
-    case 'and': return values.every(Boolean);
-    case 'or': return values.some(Boolean);
-    case 'not': if (values.length !== 1) throw new ValidationError('not expects exactly one argument.'); return !values[0];
-    case 'if': if (values.length !== 3) throw new ValidationError('if expects condition, true value, and false value.'); return values[0] ? values[1] : values[2];
-    default: throw new ValidationError(`Unsupported pipeline expression operation: ${operation}`);
-  }
-}
-
-function arithmetic(values, operation, name) {
-  if (values.length < 2 || values.some(value => value === null || value === undefined)) return null;
-  if (values.some(value => typeof value !== 'number' || !Number.isFinite(value))) throw new ValidationError(`${name} expressions require finite numeric arguments.`);
-  let result = values[0];
-  for (const value of values.slice(1)) result = operation(result, value);
-  return Number.isFinite(result) ? result : null;
-}
-function compare(values, operation) {
-  if (values.length !== 2) throw new ValidationError('Comparison expressions require exactly two arguments.');
-  if (values[0] === null || values[0] === undefined || values[1] === null || values[1] === undefined) return false;
-  return operation(values[0], values[1]);
-}
 function requireColumns(columns, operation) {
   if (!Array.isArray(columns) || columns.length === 0) throw new ValidationError(`${operation} requires a non-empty columns array.`);
   return columns;

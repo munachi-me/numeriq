@@ -6,6 +6,9 @@ import { Series } from './series.js';
 import * as stats from '../stats/descriptive.js';
 import { NORMALIZED_ROWS } from '../internal.js';
 import { extractDatePart as getDatePart } from '../utils/temporal.js';
+import { GroupedDataset } from './grouping.js';
+import { evaluateExpression } from './expressions.js';
+import { compileCondition } from './query.js';
 
 const INSPECT = Symbol.for('nodejs.util.inspect.custom');
 const isRecord = v => v !== null && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date);
@@ -129,7 +132,53 @@ export class Dataset {
   filter(predicate) { if (typeof predicate!=='function') throw new ValidationError('filter expects a predicate function.'); return this.#new(this.#rows.filter((r,i)=>predicate({...r},i))); }
   sortBy(column,direction='asc') { this.#assertColumn(column); if (!['asc','desc'].includes(direction)) throw new ValidationError("direction must be 'asc' or 'desc'."); const factor=direction==='asc'?1:-1; const rows=this.#rows.map((row,index)=>({row,index})).sort((a,b)=>{const x=a.row[column],y=b.row[column]; if(x==null&&y==null)return a.index-b.index;if(x==null)return 1;if(y==null)return -1; const tx=temporalTimestamp(x),ty=temporalTimestamp(y); if(tx!==null&&ty!==null)return (tx<ty?-1:tx>ty?1:0)*factor||a.index-b.index; return (x>y?1:x<y?-1:0)*factor||a.index-b.index;}).map(item=>item.row); return this.#new(rows); }
   limit(count) { return this.head(count); }
+  groupBy(...columns) {
+    const keys = flatten(columns);
+    if (new Set(keys).size !== keys.length) throw new ValidationError('groupBy key columns must be unique.');
+    keys.forEach(column => this.#assertColumn(column));
+    return new GroupedDataset(this.rows, this.#columns, keys, this.name,
+      (rows, resultColumns, name) => new Dataset(rows, { columns: resultColumns, name }));
+  }
   addColumn(name,valueOrFunction) { const target=validColumnName(name); if(this.#columns.includes(target)) throw new ValidationError(`Invalid or existing column: ${target}`); const cols=[...this.#columns,target]; const rows=this.#rows.map((r,i)=>({...r,[target]:typeof valueOrFunction==='function'?normalizeValue(valueOrFunction({...r},i),this.#options.normalization):normalizeValue(valueOrFunction,this.#options.normalization)})); return this.#new(rows,cols); }
+  addCalculatedColumn(name, expression) {
+    const target = validColumnName(name);
+    if (this.#columns.includes(target)) throw new ValidationError(`Invalid or existing column: ${target}`);
+    const sample = Object.fromEntries(this.#columns.map(column => [column, 1]));
+    evaluateExpression(expression, sample);
+    return this.addColumn(target, row => evaluateExpression(expression, row));
+  }
+  addConditionalColumn(name, condition, thenValue, elseValue) {
+    const target = validColumnName(name);
+    if (this.#columns.includes(target)) throw new ValidationError(`Invalid or existing column: ${target}`);
+    const matches = compileCondition(condition);
+    for (const column of matches.columns) this.#assertColumn(column);
+    const sample = Object.fromEntries(this.#columns.map(column => [column, 1]));
+    evaluateExpression(thenValue, sample);
+    evaluateExpression(elseValue, sample);
+    return this.addColumn(target, row => evaluateExpression(matches(row) ? thenValue : elseValue, row));
+  }
+  addCaseColumn(name, cases, defaultValue = null) {
+    const target = validColumnName(name);
+    if (this.#columns.includes(target)) throw new ValidationError(`Invalid or existing column: ${target}`);
+    if (!Array.isArray(cases) || cases.length === 0) throw new ValidationError('addCaseColumn requires a non-empty cases array.');
+    const sample = Object.fromEntries(this.#columns.map(column => [column, 1]));
+    const compiled = cases.map((item, index) => {
+      if (!isRecord(item) || !Object.hasOwn(item, 'when') || !Object.hasOwn(item, 'then')) {
+        throw new ValidationError(`addCaseColumn case ${index + 1} requires when and then.`);
+      }
+      const unknown = Object.keys(item).find(key => !['when', 'then'].includes(key));
+      if (unknown) throw new ValidationError(`addCaseColumn case ${index + 1} contains unknown property: ${unknown}`);
+      const matches = compileCondition(item.when);
+      for (const column of matches.columns) this.#assertColumn(column);
+      evaluateExpression(item.then, sample);
+      return { matches, value: item.then };
+    });
+    evaluateExpression(defaultValue, sample);
+    return this.addColumn(target, row => {
+      const found = compiled.find(item => item.matches(row));
+      return evaluateExpression(found ? found.value : defaultValue, row);
+    });
+  }
   mapRows(mapper) { if(typeof mapper!=='function') throw new ValidationError('mapRows expects a function.'); const rows=this.#rows.map((r,i)=>mapper({...r},i)); return new Dataset(rows,{...this.#options,name:this.name}); }
   dropDuplicates(...columns) { const cols=flatten(columns); const keys=cols.length?cols:this.#columns; const seen=new Set(); return this.filter(r=>{const key=JSON.stringify(keys.map(k=>r[k]));if(seen.has(key))return false;seen.add(key);return true;}); }
   dropMissing(options = {}) {

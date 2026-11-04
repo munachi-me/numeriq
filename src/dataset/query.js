@@ -66,6 +66,13 @@ export class Query {
 
 export function createQuery(document = {}) { return new Query(document); }
 
+export function compileCondition(condition) {
+  const normalized = normalizeCondition(condition, 'condition');
+  const predicate = row => evaluate(normalized, row);
+  Object.defineProperty(predicate, 'columns', { value: [...referencedColumns({ where: normalized })] });
+  return predicate;
+}
+
 function normalizeCondition(condition, path) {
   if (!isRecord(condition) || typeof condition.op !== 'string') throw new ValidationError(`${path} must be a condition object with an op.`);
   if (COMPOUND.has(condition.op)) {

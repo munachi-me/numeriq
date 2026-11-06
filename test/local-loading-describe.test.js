@@ -58,12 +58,18 @@ test('describe summarizes every column, includes distinct, and nulls nonnumeric 
     { amount: null, category: null, active: true }
   ]);
   const summary = dataset.describe();
-  assert.deepEqual(summary.columns, ['column', 'count', 'missing', 'distinct', 'mean', 'median', 'min', 'max', 'range', 'variance', 'std']);
+  assert.deepEqual(summary.columns, ['column', 'count', 'missing', 'distinct', 'mean', 'median', 'min', 'max', 'range', 'variance', 'std', 'q1', 'q3', 'iqr', 'mad', 'skewness', 'kurtosis']);
   assert.deepEqual(summary.rows.map((row) => row.column), ['amount', 'category', 'active']);
   assert.equal(summary.rows[0].mean, 15);
   assert.equal(summary.rows[0].distinct, 2);
   assert.equal(summary.rows[0].variance, 25);
   assert.equal(summary.rows[0].std, 5);
+  assert.equal(summary.rows[0].q1, 12.5);
+  assert.equal(summary.rows[0].q3, 17.5);
+  assert.equal(summary.rows[0].iqr, 5);
+  assert.equal(summary.rows[0].mad, 5);
+  assert.equal(summary.rows[0].skewness, null);
+  assert.equal(summary.rows[0].kurtosis, null);
   for (const row of summary.rows.slice(1)) {
     assert.equal(row.mean, null);
     assert.equal(row.median, null);
@@ -71,6 +77,12 @@ test('describe summarizes every column, includes distinct, and nulls nonnumeric 
     assert.equal(row.max, null);
     assert.equal(row.variance, null);
     assert.equal(row.std, null);
+    assert.equal(row.q1, null);
+    assert.equal(row.q3, null);
+    assert.equal(row.iqr, null);
+    assert.equal(row.mad, null);
+    assert.equal(row.skewness, null);
+    assert.equal(row.kurtosis, null);
   }
   assert.equal(summary.rows[1].count, 2);
   assert.equal(summary.rows[1].missing, 1);
@@ -79,11 +91,13 @@ test('describe summarizes every column, includes distinct, and nulls nonnumeric 
 
 test('describe(column) returns a keyed object and tables use idx', () => {
   const dataset = createDataset([{ score: 1 }, { score: 3 }, { score: 3 }]);
-  assert.deepEqual(dataset.describe('score'), {
+  const summary = dataset.describe('score');
+  assert.deepEqual({ ...summary, skewness: null }, {
     column: 'score', count: 3, missing: 0, distinct: 2,
     mean: 7 / 3, median: 3, min: 1, max: 3, range: 2,
-    variance: 8 / 9, std: Math.sqrt(8 / 9)
+    variance: 8 / 9, std: Math.sqrt(8 / 9), q1: 2, q3: 3, iqr: 1, mad: 0, skewness: null, kurtosis: null
   });
+  assert.ok(Math.abs(summary.skewness + Math.SQRT1_2) < 1e-12);
   assert.match(dataset.toTable(), /│ idx/);
   assert.match(dataset.describe().toTable(), /distinct/);
   assert.throws(() => dataset.describe('absent'), ValidationError);

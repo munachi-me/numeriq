@@ -2,7 +2,7 @@
 
 **JavaScript Data Science Engine** — a lightweight, framework-independent foundation for working with tabular data in JavaScript.
 
-> Version 0.5.0 adds dependency-free grouping and aggregation, formula-based calculated columns, conditional/case columns, and replayable pipeline support. Numeriq remains an early development build, not yet a production-stability promise.
+> Version 0.6.0 adds dependency-free advanced statistics for robust summaries, distribution shape, pairwise relationships, standard scores, and outlier flags. Numeriq remains an early development build, not yet a production-stability promise.
 
 ## Requirements
 
@@ -96,7 +96,7 @@ All Dataset transformations are immutable: they return a new Dataset and leave t
 ### Numeric and conditional operations
 
 - `roundColumn(column, precision = 0)` rounds finite numeric cells to 0–15 decimal places.
-- `flagOutliers(column, { method: 'iqr', factor?, as? })` adds a boolean flag using interpolated quartiles and the IQR fences. Missing values receive `null`; with fewer than four observed values, all observed values receive `false`.
+- `flagOutliers(column, options?)` adds a boolean flag using IQR fences by default; v0.6 also offers `method: 'zscore'` and `method: 'modifiedZScore'` with configurable thresholds. Missing values receive `null`; the IQR method returns `false` for observed values when fewer than four are available.
 - Existing helpers include `filter(predicate)`, `sortBy(column, direction?)`, `limit(count)`, `dropDuplicates(...columns)`, `unique(column)`, `nunique(column)`, `dropMissing({ columns?, how? })`, and `fillMissing(column, valueOrFunction)`.
 
 `addColumn` accepts either a literal or a callback `(row, index) => value`. `updateColumnWhere` takes a predicate `(row, index) => boolean` and a literal or replacement callback.
@@ -174,7 +174,7 @@ const byCategory = sales
   ]);
 ```
 
-Supported operations are `countRows`, `count`, `nunique`, `sum`, `mean`, `median`, `min`, `max`, `range`, `variance`, and `std`. Aggregations that use a column ignore missing values; numeric statistics use finite numeric values, and `count` counts non-missing values. Variance and standard deviation default to population calculations (`ddof: 0`); pass `ddof: 1` for sample calculations. `countRows` counts all rows in a group.
+Supported operations are `countRows`, `count`, `nunique`, `sum`, `mean`, `median`, `min`, `max`, `range`, `variance`, `std`, `quantile`, `iqr`, `mad`, `skewness`, and `kurtosis`. `quantile` requires `q` between 0 and 1 and optionally accepts the interpolation `method`. Aggregations that use a column ignore missing values; numeric statistics use finite numeric values, and `count` counts non-missing values. Variance and standard deviation default to population calculations (`ddof: 0`); pass `ddof: 1` for sample calculations. `countRows` counts all rows in a group.
 
 If an aggregation has no explicit output label, Numeriq creates a readable default such as `sum of prices`, `count of rows`, or `distinct count of product`. In array descriptors, set `name`, `as`, or `alias` to choose the displayed result column. An object form also maps output names to descriptors: `agg({ revenue: { op: 'sum', column: 'price' } })`. Output names must be unique and cannot collide with grouping keys.
 
@@ -182,7 +182,15 @@ Missing group-key values are retained as a single null-key group. Grouping is mu
 
 ## Statistics
 
-`count`, `sum`, `mean`, `median`, `min`, `max`, `range`, `variance`, and `std` are available on datasets by column name. A column `Series` also exposes these methods and `describe()`. Statistics include finite numeric values only. Variance and standard deviation default to population calculations (`ddof = 0`); pass `ddof = 1` for sample calculations. Empty numeric inputs return `null` for statistics that require values; `sum` returns `0`.
+`count`, `sum`, `mean`, `median`, `min`, `max`, `range`, `variance`, and `std` remain available on datasets and `Series`. v0.6.0 adds `quantile(column, q)`, `percentile(column, p)`, `quartiles(column)`, `iqr(column)`, `mad(column)`, `skewness(column)`, and `kurtosis(column)`; `Series` exposes the same methods without the column argument. Statistics use finite numeric values and ignore missing or nonnumeric cells. Quantiles use linear interpolation by default; `method` may be `linear`, `lower`, `higher`, `midpoint`, or `nearest`. `quartiles()` returns `{ q1, median, q3 }`; MAD is the unscaled median absolute deviation.
+
+Skewness is the population third central moment divided by the population standard deviation cubed; it requires at least three numeric values and nonzero variance. Kurtosis is **Fisher excess kurtosis** (normal distribution = 0), calculated from population moments; it requires at least four numeric values and nonzero variance. Both return `null` when those conditions are not met. `describe()` includes `q1`, `q3`, `iqr`, `mad`, `skewness`, and `kurtosis`; for mixed columns these numeric fields summarize the finite numeric values, while entirely nonnumeric columns receive `null` numeric fields.
+
+`Dataset.covariance(x, y, { ddof = 0 })` and `Dataset.correlation(x, y, { method: 'pearson' | 'spearman' })` calculate paired relationships; `Series` provides `covariance(other)` and `correlation(other, options)`. Paired statistics use pairwise-complete finite numeric observations and require equal-length value arrays. Covariance defaults to population calculation; Pearson and Spearman correlation return `null` when there are fewer than two pairs or a column is constant. Spearman uses average ranks for ties.
+
+`dataset.zScore(column, { as?, ddof? })` and `dataset.modifiedZScore(column, { as? })` append score columns; `Series.zScores()` and `Series.modifiedZScores()` return new Series. Missing/nonnumeric cells, zero-spread inputs, and otherwise undefined scores become `null`, never infinity. `flagOutliers()` preserves IQR as its default (`factor: 1.5`) and now supports `method: 'zscore'` (`threshold: 3`) and `method: 'modifiedZScore'` (`threshold: 3.5`); missing flags remain `null`, while constant numeric inputs are not flagged. If MAD is zero but values vary, modified-Z outlier flags fall back to the standard 1.5-IQR fences; modified Z-score values themselves remain `null` because the scale is undefined. The IQR flag keeps the prior minimum-four-observations behavior.
+
+Grouped `agg()` now also supports `quantile` (requires `q`, optionally accepts an interpolation `method`), `iqr`, `mad`, `skewness`, and `kurtosis`. Quantile output names default to `quantile <q> of <column>` and remain customizable with `name`, `as`, or `alias`. The core has no third-party runtime dependencies.
 
 ## Import helpers and sample files
 
@@ -217,7 +225,7 @@ In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display
 - `0.3.0` Advanced transformations: calculated columns, split/combine, date/time and text operations, numeric rounding/outlier flags, and replayable pipelines.
 - `0.4.0` Query and filtering engine: nested declarative filters, null/membership/string predicates, multi-key stable sorting, projection, pagination, JSON serialization/replay, and pipeline query steps. Weekday/month extraction supports short and long English names.
 - `0.5.0` Grouping and aggregation: stable multi-key grouping, descriptive aggregates with configurable output labels, global summaries, calculated columns, conditional/case columns, and replayable pipeline steps.
-- `0.6.0` Advanced statistics.
+- `0.6.0` Advanced statistics: quantiles/percentiles and robust spread, skewness and excess kurtosis, pairwise covariance/Pearson and Spearman correlation, Z-scores, extended outlier flags, and grouped advanced aggregates.
 - `0.7.0` Metrics and KPIs.
 - `0.8.0` Data intelligence and explainable insights.
 - `0.9.0` Visualization data and chart specifications.

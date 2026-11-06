@@ -52,7 +52,7 @@ export class Dataset {
   preview(n=10) { return this.head(n); }
   info() { return { name:this.name, rows:this.length, columns:this.#columns.length, shape:this.shape, dtypes:this.dtypes, missingValues:this.#columns.reduce((s,c)=>s+this.#rows.filter(r=>r[c]==null).length,0) }; }
   describe(column) {
-    const summaryColumns = ['column', 'count', 'missing', 'distinct', 'mean', 'median', 'min', 'max', 'range', 'variance', 'std'];
+    const summaryColumns = ['column', 'count', 'missing', 'distinct', 'mean', 'median', 'min', 'max', 'range', 'variance', 'std', 'q1', 'q3', 'iqr', 'mad', 'skewness', 'kurtosis'];
     if (column !== undefined) {
       this.#assertColumn(column);
       return { column, ...stats.describe(this.#rows.map(row => row[column])) };
@@ -312,21 +312,49 @@ export class Dataset {
   }
   flagOutliers(column, options = {}) {
     this.#assertColumn(column);
+    if (!isRecord(options)) throw new ValidationError('flagOutliers options must be an object.');
+    const unknownOption = Object.keys(options).find(key => !['method', 'factor', 'threshold', 'ddof', 'as'].includes(key));
+    if (unknownOption) throw new ValidationError(`flagOutliers does not support option: ${unknownOption}.`);
     const method = options.method ?? 'iqr';
     const factor = options.factor ?? 1.5;
+    const threshold = options.threshold ?? (method === 'modifiedZScore' ? 3.5 : 3);
     const target = validColumnName(options.as ?? `${column}_outlier`);
-    if (method !== 'iqr') throw new ValidationError("flagOutliers currently supports only method: 'iqr'.");
-    if (typeof factor !== 'number' || !Number.isFinite(factor) || factor < 0) throw new ValidationError('flagOutliers factor must be a non-negative finite number.');
+    if (!['iqr', 'zscore', 'modifiedZScore'].includes(method)) throw new ValidationError("flagOutliers method must be 'iqr', 'zscore', or 'modifiedZScore'.");
+    if (method === 'iqr' && (typeof factor !== 'number' || !Number.isFinite(factor) || factor < 0)) throw new ValidationError('flagOutliers factor must be a non-negative finite number.');
+    if (method !== 'iqr' && (typeof threshold !== 'number' || !Number.isFinite(threshold) || threshold <= 0)) throw new ValidationError('flagOutliers threshold must be a positive finite number.');
+    if (method === 'iqr' && options.threshold !== undefined) throw new ValidationError('flagOutliers threshold is only available with zscore methods.');
+    if (method !== 'iqr' && options.factor !== undefined) throw new ValidationError('flagOutliers factor is only available with the iqr method.');
+    if (method !== 'zscore' && options.ddof !== undefined) throw new ValidationError('flagOutliers ddof is only available with the zscore method.');
     if (this.#columns.includes(target)) throw new ValidationError(`Outlier flag column already exists: ${target}`);
     const present = this.#rows.map(row => row[column]).filter(value => value !== null && value !== undefined);
     if (present.some(value => typeof value !== 'number' || !Number.isFinite(value))) throw new ValidationError(`flagOutliers requires finite numeric values in column "${column}".`);
-    const sorted = [...present].sort((a, b) => a - b);
-    const q1 = sorted.length >= 4 ? quantile(sorted, 0.25) : null;
-    const q3 = sorted.length >= 4 ? quantile(sorted, 0.75) : null;
-    const spread = q1 === null ? null : q3 - q1;
-    const lower = spread === null ? -Infinity : q1 - factor * spread;
-    const upper = spread === null ? Infinity : q3 + factor * spread;
-    const rows = this.#rows.map(row => ({ ...row, [target]: row[column] == null ? null : row[column] < lower || row[column] > upper }));
+    let scores = null;
+    let modifiedFallback = null;
+    let lower = -Infinity, upper = Infinity;
+    if (method === 'iqr') {
+      const sorted = [...present].sort((a, b) => a - b);
+      const q1 = sorted.length >= 4 ? stats.quantile(sorted, 0.25) : null;
+      const q3 = sorted.length >= 4 ? stats.quantile(sorted, 0.75) : null;
+      const spread = q1 === null ? null : q3 - q1;
+      lower = spread === null ? -Infinity : q1 - factor * spread;
+      upper = spread === null ? Infinity : q3 + factor * spread;
+    } else {
+      const values = this.#rows.map(row => row[column]);
+      scores = method === 'zscore' ? stats.zScores(values, { ddof: options.ddof ?? 0 }) : stats.modifiedZScores(values);
+      const medianValue = method === 'modifiedZScore' ? stats.median(present) : null;
+      if (method === 'modifiedZScore' && stats.mad(present) === 0 && present.some(value => value !== medianValue)) {
+        const q1 = stats.quantile(present, 0.25), q3 = stats.quantile(present, 0.75);
+        const spread = q3 - q1;
+        modifiedFallback = { lower: q1 - 1.5 * spread, upper: q3 + 1.5 * spread };
+      }
+    }
+    const rows = this.#rows.map((row, index) => ({ ...row, [target]: row[column] == null ? null : method === 'iqr'
+      ? row[column] < lower || row[column] > upper
+      : scores[index] !== null
+        ? Math.abs(scores[index]) > threshold
+        : method === 'modifiedZScore' && modifiedFallback !== null
+          ? row[column] < modifiedFallback.lower || row[column] > modifiedFallback.upper
+          : false }));
     return this.#new(rows, [...this.#columns, target]);
   }
   extractDatePart(column, part, options = {}) {
@@ -364,6 +392,36 @@ export class Dataset {
   range(column) { return this.#stat(column,'range'); }
   variance(column,ddof=0) { this.#assertColumn(column); return stats.variance(this.#rows.map(r=>r[column]),ddof); }
   std(column,ddof=0) { this.#assertColumn(column); return stats.std(this.#rows.map(r=>r[column]),ddof); }
+  quantile(column, q, options = {}) { this.#assertColumn(column); return stats.quantile(this.#rows.map(row => row[column]), q, options); }
+  percentile(column, percentileValue, options = {}) { this.#assertColumn(column); return stats.percentile(this.#rows.map(row => row[column]), percentileValue, options); }
+  quartiles(column, options = {}) { this.#assertColumn(column); return stats.quartiles(this.#rows.map(row => row[column]), options); }
+  iqr(column, options = {}) { this.#assertColumn(column); return stats.iqr(this.#rows.map(row => row[column]), options); }
+  mad(column) { this.#assertColumn(column); return stats.mad(this.#rows.map(row => row[column])); }
+  skewness(column) { this.#assertColumn(column); return stats.skewness(this.#rows.map(row => row[column])); }
+  kurtosis(column) { this.#assertColumn(column); return stats.kurtosis(this.#rows.map(row => row[column])); }
+  covariance(leftColumn, rightColumn, options = {}) {
+    this.#assertColumn(leftColumn); this.#assertColumn(rightColumn);
+    return stats.covariance(this.#rows.map(row => row[leftColumn]), this.#rows.map(row => row[rightColumn]), options);
+  }
+  correlation(leftColumn, rightColumn, options = {}) {
+    this.#assertColumn(leftColumn); this.#assertColumn(rightColumn);
+    return stats.correlation(this.#rows.map(row => row[leftColumn]), this.#rows.map(row => row[rightColumn]), options);
+  }
+  zScore(column, options = {}) { return this.#appendScoreColumn(column, options, 'zscore'); }
+  modifiedZScore(column, options = {}) { return this.#appendScoreColumn(column, options, 'modifiedZScore'); }
+  #appendScoreColumn(column, options, method) {
+    this.#assertColumn(column);
+    if (!isRecord(options)) throw new ValidationError('Score options must be an object.');
+    const allowedOptions = method === 'zscore' ? ['as', 'ddof'] : ['as'];
+    const unknownOption = Object.keys(options).find(key => !allowedOptions.includes(key));
+    if (unknownOption) throw new ValidationError(`${method} does not support option: ${unknownOption}.`);
+    const target = validColumnName(options.as ?? `${column}_${method === 'zscore' ? 'zscore' : 'modified_zscore'}`);
+    if (this.#columns.includes(target)) throw new ValidationError(`Score output column already exists: ${target}`);
+    const values = this.#rows.map(row => row[column]);
+    const scores = method === 'zscore' ? stats.zScores(values, { ddof: options.ddof ?? 0 }) : stats.modifiedZScores(values);
+    const rows = this.#rows.map((row, index) => ({ ...row, [target]: scores[index] }));
+    return this.#new(rows, [...this.#columns, target]);
+  }
   #stat(column,method) { this.#assertColumn(column); return stats[method](this.#rows.map(r=>r[column])); }
   #assertColumn(name) { if(!this.#columns.includes(name)) throw new ValidationError(`Unknown column: ${name}`); }
   toJSON() { return { name:this.name, columns:this.columns, shape:this.shape, rows:this.rows, metadata:{...this.metadata}, ...(this.importReport ? { importReport:cloneValue(this.importReport) } : {}) }; }
@@ -385,12 +443,6 @@ function temporalTimestamp(value) {
   return Number.isNaN(timestamp) ? null : timestamp;
 }
 function titleCase(value) { return value.toLocaleLowerCase('en-US').replace(/(^|[\s_-])(\p{L})/gu, (_, separator, letter) => `${separator}${letter.toLocaleUpperCase('en-US')}`); }
-function quantile(sorted, probability) {
-  const position = (sorted.length - 1) * probability;
-  const lower = Math.floor(position);
-  const upper = Math.ceil(position);
-  return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower);
-}
 function validCount(n) { if(!Number.isInteger(n)||n<0) throw new ValidationError('Row count must be a non-negative integer.'); return n; }
 function flatten(items) { return items.flat(); }
 function percent(numerator, denominator) { return denominator ? Number(((numerator / denominator) * 100).toFixed(2)) : 0; }

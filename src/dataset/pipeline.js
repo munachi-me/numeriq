@@ -8,7 +8,7 @@ const SUPPORTED_OPERATIONS = new Set([
   'select', 'reorderColumns', 'dropColumns', 'renameColumn', 'renameColumns', 'splitColumn', 'combineColumns',
   'replaceText', 'trimColumn', 'changeCase', 'updateColumnWhere', 'addColumn', 'roundColumn', 'extractDatePart',
   'flagOutliers', 'dropMissing', 'fillMissing', 'castColumn', 'dropDuplicates', 'query',
-  'addCalculatedColumn', 'addConditionalColumn', 'addCaseColumn', 'groupBy'
+  'addCalculatedColumn', 'addConditionalColumn', 'addCaseColumn', 'groupBy', 'zScore', 'modifiedZScore'
 ]);
 
 export class TransformationPipeline {
@@ -120,6 +120,8 @@ function applyStep(dataset, step) {
       return dataset.addCaseColumn(step.name, step.cases, step.default ?? null);
     }
     case 'roundColumn': return dataset.roundColumn(step.column, step.precision ?? 0);
+    case 'zScore': return dataset.zScore(step.column, step.options);
+    case 'modifiedZScore': return dataset.modifiedZScore(step.column, step.options);
     case 'extractDatePart': return dataset.extractDatePart(step.column, step.part, step.options);
     case 'flagOutliers': return dataset.flagOutliers(step.column, step.options);
     case 'dropMissing': return dataset.dropMissing(step.options);

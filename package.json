@@ -1,6 +1,6 @@
 {
   "name": "numeriq",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "A lightweight JavaScript data science engine.",
   "type": "module",
   "main": "./src/index.js",

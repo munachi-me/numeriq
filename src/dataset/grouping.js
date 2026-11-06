@@ -2,7 +2,7 @@ import { ValidationError } from '../errors/index.js';
 import * as stats from '../stats/descriptive.js';
 import { cloneValue } from '../utils/values.js';
 
-const AGGREGATIONS = new Set(['countRows', 'count', 'nunique', 'sum', 'mean', 'median', 'min', 'max', 'range', 'variance', 'std']);
+const AGGREGATIONS = new Set(['countRows', 'count', 'nunique', 'sum', 'mean', 'median', 'min', 'max', 'range', 'variance', 'std', 'quantile', 'iqr', 'mad', 'skewness', 'kurtosis']);
 
 /** A grouped view created by Dataset.groupBy(). Use agg() or aggregate() to materialize it. */
 export class GroupedDataset {
@@ -68,7 +68,7 @@ function normalizeAggregations(specification, columns) {
   }
   if (!items.length) throw new ValidationError('agg requires at least one aggregation.');
   return items.map((item, index) => {
-    const allowed = new Set(['op', 'column', 'name', 'as', 'alias', 'ddof']);
+    const allowed = new Set(['op', 'column', 'name', 'as', 'alias', 'ddof', 'q', 'method']);
     const unknown = Object.keys(item).find(key => !allowed.has(key));
     if (unknown) throw new ValidationError(`Aggregation ${index + 1} contains unknown property: ${unknown}`);
     const { op, column } = item;
@@ -76,21 +76,28 @@ function normalizeAggregations(specification, columns) {
     const ddof = item.ddof ?? 0;
     if (!['variance', 'std'].includes(op) && item.ddof !== undefined) throw new ValidationError(`${op} does not accept ddof.`);
     if (!Number.isInteger(ddof) || ddof < 0) throw new ValidationError(`${op} ddof must be a non-negative integer.`);
+    if (op === 'quantile') {
+      if (item.q === undefined) throw new ValidationError('quantile aggregation requires q between 0 and 1.');
+      stats.quantile([], item.q, { method: item.method });
+    } else if (item.q !== undefined || item.method !== undefined) {
+      throw new ValidationError(`${op} does not accept q or method.`);
+    }
     if (op === 'countRows') {
       if (column !== undefined) throw new ValidationError('countRows does not take a source column.');
     } else {
       if (typeof column !== 'string' || !column.trim()) throw new ValidationError(`${op} requires a source column.`);
       if (!columns.includes(column)) throw new ValidationError(`Unknown aggregation column: ${column}`);
     }
-    const name = validName(item.name ?? defaultName(op, column));
-    return { op, column, name, ddof };
+    const name = validName(item.name ?? defaultName(op, column, item.q));
+    return { op, column, name, ddof, q: item.q, method: item.method };
   });
 }
 
-function defaultName(op, column) {
+function defaultName(op, column, q) {
   if (op === 'countRows') return 'count of rows';
   if (op === 'nunique') return `distinct count of ${column}`;
   if (op === 'count') return `count of ${column}`;
+  if (op === 'quantile') return `quantile ${q} of ${column}`;
   return `${op} of ${column}`;
 }
 
@@ -108,6 +115,11 @@ function compute(aggregation, rows) {
     case 'range': return stats.range(values);
     case 'variance': return stats.variance(values, aggregation.ddof);
     case 'std': return stats.std(values, aggregation.ddof);
+    case 'quantile': return stats.quantile(values, aggregation.q, { method: aggregation.method });
+    case 'iqr': return stats.iqr(values);
+    case 'mad': return stats.mad(values);
+    case 'skewness': return stats.skewness(values);
+    case 'kurtosis': return stats.kurtosis(values);
     default: throw new ValidationError(`Unsupported aggregation operation: ${aggregation.op}`);
   }
 }

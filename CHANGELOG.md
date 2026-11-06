@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0 — Advanced statistics
+
+- Added linear/interpolated quantiles and percentiles, quartiles, IQR, and median absolute deviation to Dataset and Series; added quantile/IQR/MAD grouped aggregates.
+- Added population-moment skewness, Fisher excess kurtosis, and their describe/grouped-summary fields with documented sample-size rules.
+- Added pairwise-complete covariance, Pearson correlation, and tie-aware Spearman rank correlation.
+- Added immutable Z-score and modified-Z-score columns/Series, replayable score pipeline steps, and opt-in Z-score outlier flags while retaining IQR as the default.
+- Extended `describe()` to summarize finite numeric values in mixed columns; modified-Z outlier flags fall back to 1.5-IQR fences when MAD is zero but observations vary.
+- Kept the runtime dependency-free; no Excel support or later KPI/insight/visualization features were pulled into this release.
+
 ## 0.5.0 — Grouping, aggregation, and column creation
 
 - Added stable multi-key and global grouping with count, distinct count, sum, mean, median, min/max, range, variance, and standard deviation aggregations.

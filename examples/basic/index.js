@@ -49,6 +49,33 @@ const lowValueQuery = createQuery({
 });
 console.log('REUSABLE QUERY:', lowValueQuery.run(sales));
 
+const amountSeries = sales.column('Total_Amount');
+console.log('ADVANCED AMOUNT STATISTICS:', {
+  q1: sales.quantile('Total_Amount', 0.25),
+  p90: sales.percentile('Total_Amount', 90),
+  quartiles: sales.quartiles('Total_Amount'),
+  iqr: amountSeries.iqr(),
+  mad: amountSeries.mad(),
+  skewness: amountSeries.skewness(),
+  excessKurtosis: amountSeries.kurtosis()
+});
+console.log('QUANTITY / AMOUNT PEARSON CORRELATION:', sales.correlation('Quantity', 'Total_Amount'));
+
+const advancedByCategory = sales.groupBy('Category').agg([
+  { op: 'quantile', column: 'Total_Amount', q: 0.9, as: 'p90 amount' },
+  { op: 'iqr', column: 'Total_Amount' },
+  { op: 'mad', column: 'Total_Amount' },
+  { op: 'skewness', column: 'Total_Amount' },
+  { op: 'kurtosis', column: 'Total_Amount' }
+]);
+console.log('ADVANCED GROUPED STATISTICS:');
+console.log(advancedByCategory);
+
+const scoredSales = sales.zScore('Total_Amount', { as: 'Amount_Zscore' })
+  .flagOutliers('Total_Amount', { method: 'modifiedZScore', as: 'Robust_Amount_Outlier' });
+console.log('STANDARDIZED AND ROBUST OUTLIER SAMPLE:');
+console.log(scoredSales.select('Transaction_ID', 'Total_Amount', 'Amount_Zscore', 'Robust_Amount_Outlier').head(5));
+
 const salesSummaryPipeline = createPipeline([
   { op: 'extractDatePart', column: 'Date', part: 'year', options: { as: 'Year' } },
   { op: 'extractDatePart', column: 'Date', part: 'month', options: { as: 'Month' } },
@@ -62,6 +89,7 @@ const salesSummaryPipeline = createPipeline([
     { when: { op: 'gte', column: 'Unit_Price', value: 200 }, then: { literal: 'premium' } },
     { when: { op: 'gte', column: 'Unit_Price', value: 50 }, then: { literal: 'mid-range' } }
   ], default: { literal: 'value' } },
+  { op: 'zScore', column: 'Total_Amount', options: { as: 'Amount_Zscore' } },
   { op: 'groupBy', columns: ['Year', 'Month', 'Category'], aggregations: [
     { op: 'countRows' },
     { op: 'sum', column: 'Total_Amount', as: 'Revenue' },

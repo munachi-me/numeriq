@@ -2,7 +2,7 @@
 
 **JavaScript Data Science Engine** — a lightweight, framework-independent foundation for working with tabular data in JavaScript.
 
-> Version 0.6.0 adds dependency-free advanced statistics for robust summaries, distribution shape, pairwise relationships, standard scores, and outlier flags. Numeriq remains an early development build, not yet a production-stability promise.
+> Version 0.7.0 adds a dependency-free, serializable metrics and KPI engine with targets, baseline comparisons, and segmented scorecards. Numeriq remains an early development build, not yet a production-stability promise.
 
 ## Requirements
 
@@ -180,6 +180,45 @@ If an aggregation has no explicit output label, Numeriq creates a readable defau
 
 Missing group-key values are retained as a single null-key group. Grouping is multi-key and type-aware. Calling `groupBy()` with no keys requests a global aggregate; an empty source yields zero for `countRows` and `sum`, and `null` for statistics that need observations. Empty keyed results retain the requested output schema. Filter with `createQuery()` before grouping and query the resulting summary Dataset afterward. Grouping does not yet include pivot tables, joins, rollups, or aggregate-result `HAVING` filters.
 
+## Metrics and KPI scorecards (v0.7.0)
+
+`createMetricSet(definitions)` (or `new MetricSet(definitions)`) creates a reusable collection of JSON-serializable KPI definitions. A definition uses exactly one of `aggregation` or `formula`. Aggregations reuse the supported Dataset/grouped operations, and aggregation metrics may include a query condition in `where`. Formulas use the safe expression language and refer to other metrics with `{ metric: 'metricId' }`; dependencies are resolved even when the referenced metric is declared later.
+
+```js
+import { createMetricSet, MetricSet } from 'numeriq';
+
+const kpis = createMetricSet([
+  {
+    id: 'revenue',
+    label: 'Revenue',
+    unit: 'USD',
+    aggregation: { op: 'sum', column: 'Total_Amount' },
+    target: { on: 'value', op: 'gte', value: 1000 }
+  },
+  {
+    id: 'orders',
+    aggregation: { op: 'countRows' },
+    target: { op: 'gte', value: 5 }
+  },
+  {
+    id: 'averageOrderValue',
+    label: 'Average order value',
+    unit: 'USD/order',
+    formula: { op: 'divide', args: [{ metric: 'revenue' }, { metric: 'orders' }] }
+  }
+]);
+
+const scorecard = kpis.evaluate(currentSales, {
+  baseline: previousSales,
+  groupBy: ['Category']
+});
+console.log(scorecard); // A Dataset with one row per category and metric
+```
+
+Targets default to `on: 'value'` and support `gt`, `gte`, `lt`, `lte`, `eq`, and inclusive `between` rules. Use `on: 'change'` to compare the signed absolute difference (`current - baseline`), or `on: 'percentChange'` to compare percentage points calculated as `(current - baseline) / baseline * 100`. A zero or unavailable baseline makes percentage change not evaluable. Each scorecard row reports `metricId`, label/description, value/unit, target details, baseline value, `change`, `percentChange`, and a status of `met`, `missed`, `notEvaluable`, or `noTarget`.
+
+Pass `groupBy` column names to evaluate one scorecard per segment. Baseline groups are matched by their typed key; a current segment absent from the baseline is retained, with null comparison values and a `notEvaluable` change target. `MetricSet` and `createMetricSet` are also available from the `numeriq/metrics` subpath. Serialize a definition with `JSON.stringify(kpis)` and restore it using `MetricSet.fromJSON(document)` or `createMetricSet(document)`. Internal dependency metadata is not exposed, and the engine adds no runtime dependencies.
+
 ## Statistics
 
 `count`, `sum`, `mean`, `median`, `min`, `max`, `range`, `variance`, and `std` remain available on datasets and `Series`. v0.6.0 adds `quantile(column, q)`, `percentile(column, p)`, `quartiles(column)`, `iqr(column)`, `mad(column)`, `skewness(column)`, and `kurtosis(column)`; `Series` exposes the same methods without the column argument. Statistics use finite numeric values and ignore missing or nonnumeric cells. Quantiles use linear interpolation by default; `method` may be `linear`, `lower`, `higher`, `midpoint`, or `nearest`. `quartiles()` returns `{ q1, median, q3 }`; MAD is the unscaled median absolute deviation.
@@ -226,7 +265,7 @@ In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display
 - `0.4.0` Query and filtering engine: nested declarative filters, null/membership/string predicates, multi-key stable sorting, projection, pagination, JSON serialization/replay, and pipeline query steps. Weekday/month extraction supports short and long English names.
 - `0.5.0` Grouping and aggregation: stable multi-key grouping, descriptive aggregates with configurable output labels, global summaries, calculated columns, conditional/case columns, and replayable pipeline steps.
 - `0.6.0` Advanced statistics: quantiles/percentiles and robust spread, skewness and excess kurtosis, pairwise covariance/Pearson and Spearman correlation, Z-scores, extended outlier flags, and grouped advanced aggregates.
-- `0.7.0` Metrics and KPIs.
+- `0.7.0` Metrics and KPIs: reusable serializable definitions, derived formulas, targets, baseline comparisons, and segmented scorecards returned as Datasets.
 - `0.8.0` Data intelligence and explainable insights.
 - `0.9.0` Visualization data and chart specifications.
 - `0.10.0` Dashboard and reporting foundations.

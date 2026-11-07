@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0 — Metrics and KPI engine
+
+- Added reusable, versioned, JSON-serializable `MetricSet` definitions and exported `MetricSet` / `createMetricSet` from the package root and `numeriq/metrics` subpath.
+- Added aggregation metrics, safe expression-based derived KPIs, dependency resolution, and optional declarative filters.
+- Added value, absolute-change, and percentage-change targets with `gt`, `gte`, `lt`, `lte`, `eq`, and inclusive range rules.
+- Added baseline comparisons and grouped scorecards matched by segment keys; evaluation returns a regular Dataset with target status and comparison fields.
+- Kept the engine dependency-free and preserved the v0.1–v0.6 functionality.
+
 ## 0.6.0 — Advanced statistics
 
 - Added linear/interpolated quantiles and percentiles, quartiles, IQR, and median absolute deviation to Dataset and Series; added quantile/IQR/MAD grouped aggregates.

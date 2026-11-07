@@ -1,5 +1,6 @@
 import {
   createDataset,
+  createMetricSet,
   createPipeline,
   createQuery,
   loadCSV,
@@ -117,3 +118,37 @@ const cleaned = raw
 console.log('PROFILE BEFORE CLEANING:', raw.profile());
 console.log('CLEANED DATA');
 console.log(cleaned);
+
+
+// v0.7.0 KPI scorecard: compare the first and second parts of the bundled
+// chronologically ordered sample as baseline and current-period cohorts.
+const baselineSales = sales.head(12);
+const currentSales = sales.tail(sales.length - baselineSales.length);
+const salesKpis = createMetricSet([
+  {
+    id: 'revenue',
+    label: 'Revenue',
+    unit: 'USD',
+    aggregation: { op: 'sum', column: 'Total_Amount' },
+    target: { on: 'percentChange', op: 'gte', value: 0 }
+  },
+  {
+    id: 'transactions',
+    label: 'Transactions',
+    aggregation: { op: 'countRows' },
+    target: { op: 'gte', value: 3 }
+  },
+  {
+    id: 'averageOrderValue',
+    label: 'Average order value',
+    unit: 'USD/order',
+    formula: { op: 'divide', args: [{ metric: 'revenue' }, { metric: 'transactions' }] }
+  }
+]);
+const salesScorecard = salesKpis.evaluate(currentSales, {
+  baseline: baselineSales,
+  groupBy: ['Category']
+});
+console.log('V0.7 KPI SCORECARD BY CATEGORY (WITH BASELINE COMPARISON)');
+console.log(salesScorecard);
+console.log('SERIALIZED METRIC DEFINITIONS:', JSON.stringify(salesKpis));

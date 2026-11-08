@@ -2,6 +2,7 @@ export { Dataset, createDataset } from './dataset/dataset.js';
 export { GroupedDataset } from './dataset/grouping.js';
 export { MetricSet, createMetricSet } from './dataset/metrics.js';
 export { InsightSet, createInsightSet } from './dataset/insights.js';
+export { ChartSpec, createChartSpec } from './dataset/charts.js';
 export { TransformationPipeline, createPipeline } from './dataset/pipeline.js';
 export { Query, createQuery } from './dataset/query.js';
 export { Series } from './dataset/series.js';

@@ -2,7 +2,7 @@
 
 **JavaScript Data Science Engine** — a lightweight, framework-independent foundation for working with tabular data in JavaScript.
 
-> Version 0.8.0 adds dependency-free, serializable explainable insight rules with user-defined thresholds for KPI changes and numeric outliers. Numeriq remains an early development build, not yet a production-stability promise.
+> Version 0.9.0 adds dependency-free, serializable chart specifications and chart-ready Dataset preparation for bar, line, and scatter visualizations. Numeriq remains an early development build, not yet a production-stability promise.
 
 ## Requirements
 
@@ -261,6 +261,34 @@ console.log(findings);
 
 `outlier` rules accept `method: 'iqr' | 'zscore' | 'modifiedZScore'` and one or more user-defined score thresholds. Z-score methods compare the absolute score. IQR score is the distance outside Q1/Q3 divided by IQR, so a cutoff of `1.5` matches the usual 1.5-IQR fences; zero-IQR groups have no defined IQR score. Outlier results include the original row index and segment values. Explanations report the observed value, score or metric comparison, and matching rule; they do not infer causation. Serialize an InsightSet with `JSON.stringify(insights)` and restore it with `InsightSet.fromJSON(document)` or `createInsightSet(document)`. `InsightSet` and `createInsightSet` are also exported from `numeriq/insights`.
 
+## Visualization data and chart specifications (v0.9.0)
+
+`createChartSpec(definition)` or `new ChartSpec(definition)` creates a versioned, JSON-serializable, renderer-neutral description for a `bar`, `line`, or `scatter` chart. The required `x` and `y` mappings identify the axis fields; `series` optionally identifies a grouping/color series. Usually both mappings name Dataset columns. For `aggregate: { op: 'countRows' }`, `y` instead names the generated output column. `title`, `xLabel`, and `yLabel` provide display text. No drawing library is included.
+
+```js
+import { createChartSpec } from 'numeriq';
+
+const revenueChart = createChartSpec({
+  type: 'bar',
+  x: 'Category',
+  y: 'Total_Amount',
+  series: 'Product',
+  title: 'Revenue by category and product',
+  xLabel: 'Category',
+  yLabel: 'Revenue (USD)',
+  aggregate: { op: 'sum' },
+  sort: { by: 'y', direction: 'desc' },
+  options: { legend: true, grid: true, stacked: true }
+});
+
+const chartData = revenueChart.prepare(sales);
+console.log(chartData); // Dataset columns: Category, Total_Amount, Product
+```
+
+`prepare(dataset)` returns a regular Dataset in mapping order (`x`, `y`, then optional `series`). Without aggregation it selects those fields and preserves source row order. With `aggregate: { op }`, bar and line charts group by `x` and optional `series`, then aggregate the mapped `y` field into a column with the same name. `countRows` is also supported and uses `y` as the output alias, so a source `y` column is not needed for that operation. Other aggregations use `y` as their source column. Supported operations reuse Dataset's grouped aggregations, including `sum`, `mean`, `median`, `count`, `nunique`, `min`, `max`, quantiles, and robust statistics; quantile requires `q` and variance/std accept `ddof`. Scatter charts are raw point series and do not aggregate. Raw chart value axes must be finite numbers or `null`; scatter `x` values follow the same rule. Missing values are preserved.
+
+Groups remain in first-seen order unless `sort: { by: 'x' | 'y' | 'series', direction: 'asc' | 'desc' }` is provided; sorting is stable and nulls remain last. Common `options` are `legend` and `grid`. Bar charts also accept `stacked` and `orientation: 'vertical' | 'horizontal'`; line charts accept `connectNulls`; scatter charts accept a positive `pointSize`. Invalid fields and chart-specific options are rejected. Serialize with `JSON.stringify(spec)` and restore with `ChartSpec.fromJSON(document)` or `createChartSpec(document)`. The API is also exported from `numeriq/charts`, and prepared chart data can come from any Dataset, including v0.7 scorecards and v0.8 findings.
+
 ## Statistics
 
 `count`, `sum`, `mean`, `median`, `min`, `max`, `range`, `variance`, and `std` remain available on datasets and `Series`. v0.6.0 adds `quantile(column, q)`, `percentile(column, p)`, `quartiles(column)`, `iqr(column)`, `mad(column)`, `skewness(column)`, and `kurtosis(column)`; `Series` exposes the same methods without the column argument. Statistics use finite numeric values and ignore missing or nonnumeric cells. Quantiles use linear interpolation by default; `method` may be `linear`, `lower`, `higher`, `midpoint`, or `nearest`. `quartiles()` returns `{ q1, median, q3 }`; MAD is the unscaled median absolute deviation.
@@ -309,7 +337,7 @@ In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display
 - `0.6.0` Advanced statistics: quantiles/percentiles and robust spread, skewness and excess kurtosis, pairwise covariance/Pearson and Spearman correlation, Z-scores, extended outlier flags, and grouped advanced aggregates.
 - `0.7.0` Metrics and KPIs: reusable serializable definitions, derived formulas, targets, baseline comparisons, and segmented scorecards returned as Datasets.
 - `0.8.0` Data intelligence and explainable insights: serializable deterministic rules, target-miss detection, user-defined KPI threshold/severity bands, grouped IQR/Z-score outlier rules, and evidence-backed Dataset findings.
-- `0.9.0` Visualization data and chart specifications.
+- `0.9.0` Visualization data and chart specifications: serializable renderer-neutral bar, line, and scatter specs; optional series grouping and aggregation; stable chart-ready Dataset preparation.
 - `0.10.0` Dashboard and reporting foundations.
 - `1.0.0` Stable integrated API.
 

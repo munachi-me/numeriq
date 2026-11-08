@@ -1,4 +1,5 @@
 import {
+  createChartSpec,
   createDataset,
   createInsightSet,
   createMetricSet,
@@ -191,3 +192,33 @@ const salesFindings = salesInsights.evaluate(currentSales, {
 console.log('V0.8 EXPLAINABLE SALES INSIGHTS');
 console.log(salesFindings.head(10));
 console.log('SERIALIZED INSIGHT RULES:', JSON.stringify(salesInsights));
+
+
+// v0.9.0 renderer-neutral chart specs and chart-ready Dataset preparation.
+const revenueChartSpec = createChartSpec({
+  type: 'bar',
+  x: 'Category',
+  y: 'Total_Amount',
+  series: 'Product',
+  title: 'Revenue by category and product',
+  xLabel: 'Category',
+  yLabel: 'Revenue (USD)',
+  aggregate: { op: 'sum' },
+  sort: { by: 'y', direction: 'desc' },
+  options: { legend: true, grid: true, stacked: true }
+});
+const revenueChartData = revenueChartSpec.prepare(sales);
+console.log('V0.9 BAR CHART SPEC:', JSON.stringify(revenueChartSpec));
+console.log('V0.9 CHART-READY REVENUE DATA:');
+console.log(revenueChartData.head(8));
+
+const quantityRevenueScatter = createChartSpec({
+  type: 'scatter',
+  x: 'Quantity',
+  y: 'Total_Amount',
+  series: 'Category',
+  title: 'Order quantity vs. amount',
+  options: { legend: true, pointSize: 3, grid: true }
+});
+console.log('V0.9 SCATTER CHART DATA:');
+console.log(quantityRevenueScatter.prepare(sales).head(8));

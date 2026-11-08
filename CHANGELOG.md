@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.0 — Visualization data and chart specifications
+
+- Added versioned, JSON-serializable `ChartSpec` definitions and exported `ChartSpec` / `createChartSpec` from the package root and `numeriq/charts` subpath.
+- Added renderer-neutral bar, line, and scatter specifications with validated field mappings, labels, and chart-specific options.
+- Added chart-ready Dataset preparation with optional grouped aggregations, series mapping, stable sorting, and preserved missing values.
+- Added serialization, empty-input, aggregation, sort-order, and validation tests plus runnable sales-data examples.
+- Kept Numeriq dependency-free and preserved v0.1–v0.8 behavior.
+
 ## 0.8.0 — Data intelligence and explainable insights
 
 - Added versioned, JSON-serializable `InsightSet` rules and exported `InsightSet` / `createInsightSet` from the package root and `numeriq/insights` subpath.

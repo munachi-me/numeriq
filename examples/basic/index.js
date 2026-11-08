@@ -1,5 +1,6 @@
 import {
   createDataset,
+  createInsightSet,
   createMetricSet,
   createPipeline,
   createQuery,
@@ -136,7 +137,7 @@ const salesKpis = createMetricSet([
     id: 'transactions',
     label: 'Transactions',
     aggregation: { op: 'countRows' },
-    target: { op: 'gte', value: 3 }
+    target: { op: 'gte', value: 8 }
   },
   {
     id: 'averageOrderValue',
@@ -152,3 +153,41 @@ const salesScorecard = salesKpis.evaluate(currentSales, {
 console.log('V0.7 KPI SCORECARD BY CATEGORY (WITH BASELINE COMPARISON)');
 console.log(salesScorecard);
 console.log('SERIALIZED METRIC DEFINITIONS:', JSON.stringify(salesKpis));
+
+
+// v0.8.0 deterministic insights with user-configurable threshold bands.
+const salesInsights = createInsightSet([
+  {
+    id: 'missed-transaction-goal',
+    type: 'targetMissed',
+    metricId: 'transactions',
+    severity: 'warning'
+  },
+  {
+    id: 'high-revenue-band',
+    type: 'metricThreshold',
+    metricId: 'revenue',
+    thresholds: [
+      { on: 'value', op: 'gte', value: 500, severity: 'warning' },
+      { on: 'value', op: 'gte', value: 1400, severity: 'critical' }
+    ]
+  },
+  {
+    id: 'unusual-order-amount',
+    type: 'outlier',
+    column: 'Total_Amount',
+    method: 'iqr',
+    thresholds: [
+      { op: 'gte', value: 1.5, severity: 'warning' },
+      { op: 'gte', value: 3, severity: 'critical' }
+    ]
+  }
+]);
+const salesFindings = salesInsights.evaluate(currentSales, {
+  metricSet: salesKpis,
+  baseline: baselineSales,
+  groupBy: ['Category']
+});
+console.log('V0.8 EXPLAINABLE SALES INSIGHTS');
+console.log(salesFindings.head(10));
+console.log('SERIALIZED INSIGHT RULES:', JSON.stringify(salesInsights));

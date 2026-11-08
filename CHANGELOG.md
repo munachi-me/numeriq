@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.0 — Data intelligence and explainable insights
+
+- Added versioned, JSON-serializable `InsightSet` rules and exported `InsightSet` / `createInsightSet` from the package root and `numeriq/insights` subpath.
+- Added KPI target-miss detection and user-defined value, absolute-change, percentage-change, and outlier-score thresholds with `info`, `warning`, and `critical` severity bands.
+- Added grouped IQR, Z-score, and modified-Z-score outlier findings with original row indexes and deterministic explanations.
+- Added evidence-bearing insight Datasets, serialization/validation coverage, and a runnable scorecard-plus-insights example.
+- Kept the engine dependency-free and preserved v0.1–v0.7 behavior.
+
 ## 0.7.0 — Metrics and KPI engine
 
 - Added reusable, versioned, JSON-serializable `MetricSet` definitions and exported `MetricSet` / `createMetricSet` from the package root and `numeriq/metrics` subpath.

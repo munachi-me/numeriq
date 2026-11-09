@@ -1,6 +1,7 @@
 import { ValidationError } from '../errors/index.js';
 import { Dataset } from './dataset.js';
 import { MetricSet } from './metrics.js';
+import { assertMetricScorecardContext } from './scorecard-provenance.js';
 import * as stats from '../stats/descriptive.js';
 
 const INSIGHT_SET_VERSION = 1;
@@ -8,6 +9,10 @@ const SEVERITIES = new Map([['info', 1], ['warning', 2], ['critical', 3]]);
 const THRESHOLD_OPERATORS = new Set(['gt', 'gte', 'lt', 'lte', 'eq', 'between']);
 const METRIC_FIELDS = new Set(['value', 'change', 'percentChange']);
 const RULE_TYPES = new Set(['targetMissed', 'metricThreshold', 'outlier']);
+const METRIC_SCORECARD_COLUMNS = [
+  'metricId', 'label', 'description', 'value', 'unit', 'targetOn', 'targetOp',
+  'targetValue', 'baselineValue', 'change', 'percentChange', 'status'
+];
 const RESULT_COLUMNS = [
   'insightId', 'type', 'severity', 'title', 'explanation', 'metricId', 'column',
   'rowIndex', 'value', 'baselineValue', 'change', 'percentChange', 'threshold', 'score'
@@ -41,11 +46,14 @@ export class InsightSet {
   evaluate(dataset, options = {}) {
     if (!(dataset instanceof Dataset)) throw new ValidationError('InsightSet.evaluate expects a Dataset.');
     if (!isRecord(options)) throw new ValidationError('InsightSet evaluation options must be an object.');
-    assertKnownKeys(options, new Set(['metricSet', 'baseline', 'groupBy']), 'InsightSet evaluation options');
+    assertKnownKeys(options, new Set(['metricSet', 'scorecard', 'baseline', 'groupBy']), 'InsightSet evaluation options');
     const metricSet = options.metricSet;
+    const scorecard = options.scorecard;
     const baseline = options.baseline;
     const groupBy = options.groupBy ?? [];
     if (metricSet !== undefined && !(metricSet instanceof MetricSet)) throw new ValidationError('InsightSet metricSet must be a MetricSet.');
+    if (scorecard !== undefined && !(scorecard instanceof Dataset)) throw new ValidationError('InsightSet scorecard must be a Dataset.');
+    if (scorecard !== undefined && !metricSet) throw new ValidationError('InsightSet scorecard requires a MetricSet.');
     if (baseline !== undefined && !(baseline instanceof Dataset)) throw new ValidationError('InsightSet baseline must be a Dataset.');
     if (!Array.isArray(groupBy) || groupBy.some(column => typeof column !== 'string' || !column.trim())) {
       throw new ValidationError('InsightSet groupBy must be an array of non-empty column names.');
@@ -60,6 +68,7 @@ export class InsightSet {
     const metricRules = this.#rules.filter(rule => rule.type !== 'outlier');
     const outlierRules = this.#rules.filter(rule => rule.type === 'outlier');
     if (metricRules.length && !metricSet) throw new ValidationError('InsightSet metric rules require a MetricSet evaluation option.');
+    if (scorecard && !metricRules.length) throw new ValidationError('InsightSet scorecard requires at least one metric rule.');
     if (baseline && !metricRules.length) throw new ValidationError('InsightSet baseline requires at least one metric rule.');
     for (const rule of outlierRules) {
       if (!dataset.columns.includes(rule.column)) throw new ValidationError(`Insight rule "${rule.id}" references unknown column: ${rule.column}`);
@@ -71,7 +80,9 @@ export class InsightSet {
     }
 
     const metricRows = metricRules.length
-      ? metricSet.evaluate(dataset, { baseline, groupBy }).rows
+      ? scorecard
+        ? validatePrecomputedScorecard(scorecard, metricSet, dataset, baseline, groupBy)
+        : metricSet.evaluate(dataset, { baseline, groupBy }).rows
       : [];
     if (metricRules.length) validateMetricReferences(metricRules, metricSet);
 
@@ -194,6 +205,19 @@ function validateMetricReferences(rules, metricSet) {
       if (!metric.target) throw new ValidationError(`Insight rule "${rule.id}" requires metric "${rule.metricId}" to define a target.`);
     }
   }
+}
+
+function validatePrecomputedScorecard(scorecard, metricSet, dataset, baseline, groupBy) {
+  assertMetricScorecardContext(scorecard, { metricSet, dataset, baseline, groupBy });
+  const requiredColumns = [...groupBy, ...METRIC_SCORECARD_COLUMNS];
+  const missing = requiredColumns.find(column => !scorecard.columns.includes(column));
+  if (missing) throw new ValidationError(`InsightSet scorecard is missing column: ${missing}`);
+  const metricIds = new Set(metricSet.metrics.map(metric => metric.id));
+  const rows = scorecard.rows;
+  for (const row of rows) {
+    if (!metricIds.has(row.metricId)) throw new ValidationError(`InsightSet scorecard contains unknown metric: ${row.metricId}`);
+  }
+  return rows;
 }
 
 function makeMetricFinding(rule, row, groupBy, details) {

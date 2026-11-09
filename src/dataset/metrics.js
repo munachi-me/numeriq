@@ -2,6 +2,7 @@ import { ValidationError } from '../errors/index.js';
 import { Dataset } from './dataset.js';
 import { compileCondition } from './query.js';
 import { evaluateExpression } from './expressions.js';
+import { registerMetricScorecard } from './scorecard-provenance.js';
 import * as stats from '../stats/descriptive.js';
 
 const METRIC_SET_VERSION = 1;
@@ -97,10 +98,10 @@ export class MetricSet {
         });
       }
     }
-    return new Dataset(rows, {
+    return registerMetricScorecard(new Dataset(rows, {
       columns: [...groupBy, ...RESULT_COLUMNS],
       name: 'Metric scorecard'
-    });
+    }), { metricSet: this, dataset, baseline, groupBy });
   }
 }
 

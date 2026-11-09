@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.0 — Dashboard and reporting foundations
+
+- Added versioned, JSON-serializable `DashboardSpec` layouts with metric, chart, and insight panels, grid validation, and renderer-neutral prepared Dataset results.
+- Added ordered `ReportSpec` sections for text, metrics, insights, charts, and tables, with JSON-serializable snapshots and a 100-row default table limit.
+- Reused one computed scorecard across dashboard/report panels and metric-driven insights; added root exports and `numeriq/dashboard` / `numeriq/report` subpaths.
+- Added integration tests and runnable examples without adding a renderer or runtime dependency; preserved v0.1–v0.9 behavior.
+
 ## 0.9.0 — Visualization data and chart specifications
 
 - Added versioned, JSON-serializable `ChartSpec` definitions and exported `ChartSpec` / `createChartSpec` from the package root and `numeriq/charts` subpath.

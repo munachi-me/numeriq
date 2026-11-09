@@ -1,10 +1,12 @@
 import {
   createChartSpec,
+  createDashboardSpec,
   createDataset,
   createInsightSet,
   createMetricSet,
   createPipeline,
   createQuery,
+  createReportSpec,
   loadCSV,
   loadMany,
   useSampleDataset
@@ -222,3 +224,47 @@ const quantityRevenueScatter = createChartSpec({
 });
 console.log('V0.9 SCATTER CHART DATA:');
 console.log(quantityRevenueScatter.prepare(sales).head(8));
+
+
+// v0.10.0 composes existing scorecards, insights, and chart specs without a renderer.
+const salesDashboardSpec = createDashboardSpec({
+  title: 'Sales performance',
+  description: 'Category KPIs and actionable findings',
+  groupBy: ['Category'],
+  metricSet: salesKpis,
+  insightSet: salesInsights,
+  layout: { columns: 12 },
+  panels: [
+    { id: 'revenue-kpi', type: 'metric', metricId: 'revenue', layout: { x: 0, y: 0, w: 3, h: 1 } },
+    {
+      id: 'kpi-chart', type: 'chart', source: 'metrics',
+      chart: { type: 'bar', x: 'Category', y: 'value', series: 'metricId', title: 'Category KPIs' },
+      layout: { x: 3, y: 0, w: 6, h: 4 }
+    },
+    { id: 'warnings', type: 'insights', severity: 'warning', limit: 10, layout: { x: 9, y: 0, w: 3, h: 4 } }
+  ]
+});
+const salesDashboardData = salesDashboardSpec.prepare(currentSales, { baseline: baselineSales });
+console.log('V0.10 DASHBOARD SPEC:', JSON.stringify(salesDashboardSpec));
+console.log('V0.10 PREPARED DASHBOARD PANELS:', salesDashboardData.panels.map(panel => ({ id: panel.id, type: panel.type, rows: panel.data.length })));
+
+const salesReportSpec = createReportSpec({
+  title: 'Weekly sales report',
+  description: 'KPI, insight, and source-data snapshot',
+  groupBy: ['Category'],
+  metricSet: salesKpis,
+  insightSet: salesInsights,
+  sections: [
+    { id: 'summary', type: 'text', heading: 'Summary', text: 'Review category performance against the prior cohort.' },
+    { id: 'kpis', type: 'metrics', metricIds: ['revenue', 'transactions'] },
+    { id: 'warnings', type: 'insights', severity: 'warning', limit: 10 },
+    {
+      id: 'category-chart', type: 'chart', source: 'metrics',
+      chart: { type: 'bar', x: 'Category', y: 'value', series: 'metricId', title: 'Category KPIs' }
+    },
+    { id: 'source-rows', type: 'table', source: 'dataset', columns: ['Category', 'Product', 'Total_Amount'], limit: 5 }
+  ]
+});
+const salesReportSnapshot = salesReportSpec.prepare(currentSales, { baseline: baselineSales });
+console.log('V0.10 REPORT SPEC:', JSON.stringify(salesReportSpec));
+console.log('V0.10 JSON REPORT SNAPSHOT BYTES:', Buffer.byteLength(JSON.stringify(salesReportSnapshot), 'utf8'));

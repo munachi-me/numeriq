@@ -149,6 +149,24 @@ test('missing baselines and unmatched baseline segments do not produce false cha
   assert.equal(rule.evaluate(data, { metricSet: metrics, baseline: old, groupBy: ['Region'] }).rows.length, 0);
 });
 
+test('InsightSet reuses a precomputed MetricSet scorecard with identical findings', () => {
+  const metricSet = salesMetrics();
+  const options = { baseline, groupBy: ['Region'] };
+  const scorecard = metricSet.evaluate(current, options);
+  const rules = createInsightSet([
+    { id: 'missed', type: 'targetMissed', metricId: 'revenue', severity: 'critical' },
+    { id: 'drop', type: 'metricThreshold', metricId: 'revenue', thresholds: [{ on: 'percentChange', op: 'lte', value: -5, severity: 'warning' }] }
+  ]);
+  const expected = rules.evaluate(current, { metricSet, ...options });
+  const reused = rules.evaluate(current, { metricSet, scorecard, ...options });
+  assert.deepEqual(reused.rows, expected.rows);
+  assert.throws(() => rules.evaluate(createDataset(current.rows), { metricSet, scorecard, ...options }), /same Dataset, baseline, and groupBy/);
+  assert.throws(() => rules.evaluate(current, { metricSet, scorecard, baseline: createDataset(baseline.rows), groupBy: ['Region'] }), /same Dataset, baseline, and groupBy/);
+  assert.throws(() => rules.evaluate(current, { metricSet, scorecard, baseline, groupBy: [] }), /same Dataset, baseline, and groupBy/);
+  assert.throws(() => rules.evaluate(current, { metricSet: salesMetrics(), scorecard, ...options }), /same Dataset, baseline, and groupBy/);
+  assert.throws(() => rules.evaluate(current, { metricSet, scorecard: createDataset([], { columns: scorecard.columns }), ...options }), /must come directly from the supplied MetricSet/);
+});
+
 test('InsightSet rules serialize and restore without changing results', () => {
   const rules = createInsightSet([
     { id: 'target', type: 'targetMissed', metricId: 'revenue', severity: 'warning' },

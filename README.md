@@ -2,7 +2,7 @@
 
 **JavaScript Data Science Engine** — a lightweight, framework-independent foundation for working with tabular data in JavaScript.
 
-> Version 0.9.0 adds dependency-free, serializable chart specifications and chart-ready Dataset preparation for bar, line, and scatter visualizations. Numeriq remains an early development build, not yet a production-stability promise.
+> Version 0.10.0 adds serializable DashboardSpec and ReportSpec compositions over KPIs, insights, chart specifications, and Dataset results. Output is renderer-neutral; Numeriq remains an early development build, not yet a production-stability promise.
 
 ## Requirements
 
@@ -289,6 +289,58 @@ console.log(chartData); // Dataset columns: Category, Total_Amount, Product
 
 Groups remain in first-seen order unless `sort: { by: 'x' | 'y' | 'series', direction: 'asc' | 'desc' }` is provided; sorting is stable and nulls remain last. Common `options` are `legend` and `grid`. Bar charts also accept `stacked` and `orientation: 'vertical' | 'horizontal'`; line charts accept `connectNulls`; scatter charts accept a positive `pointSize`. Invalid fields and chart-specific options are rejected. Serialize with `JSON.stringify(spec)` and restore with `ChartSpec.fromJSON(document)` or `createChartSpec(document)`. The API is also exported from `numeriq/charts`, and prepared chart data can come from any Dataset, including v0.7 scorecards and v0.8 findings.
 
+## Dashboards and reports (v0.10.0)
+
+`createDashboardSpec(definition)` composes existing MetricSet, InsightSet, and ChartSpec definitions into a renderer-neutral dashboard layout. It stores only the serializable definitions and layout—not the source Dataset. `prepare(dataset, { baseline?, groupBy? })` evaluates the required scorecard and findings once, then returns a `dashboardData` object whose panels contain their prepared Dataset results.
+
+Dashboard layouts use a configurable column grid (12 columns by default). Each panel needs a unique `id` and a zero-based `{ x, y, w, h }` position; panels must fit the grid and may not overlap. The initial panel types are `metric` (one `metricId`), `chart` (an embedded ChartSpec), and `insights` (optionally filtered by `severity` and capped with `limit`). Chart panels can read from `source: 'dataset' | 'metrics' | 'insights'`; metric and insight panels require the corresponding embedded definitions.
+
+```js
+import { createDashboardSpec } from 'numeriq';
+
+const dashboard = createDashboardSpec({
+  title: 'Sales overview',
+  groupBy: ['Category'],
+  metricSet: kpis,
+  insightSet: insights,
+  panels: [
+    { id: 'revenue', type: 'metric', metricId: 'revenue', layout: { x: 0, y: 0, w: 3, h: 1 } },
+    {
+      id: 'kpi-chart', type: 'chart', source: 'metrics',
+      chart: { type: 'bar', x: 'Category', y: 'value', series: 'metricId' },
+      layout: { x: 3, y: 0, w: 6, h: 3 }
+    },
+    { id: 'alerts', type: 'insights', severity: 'warning', limit: 10, layout: { x: 9, y: 0, w: 3, h: 3 } }
+  ]
+});
+
+const dashboardData = dashboard.prepare(currentSales, { baseline: previousSales });
+console.log(dashboardData.panels[1].data); // chart-ready Dataset
+```
+
+`createReportSpec(definition)` creates an ordered report from `text`, `metrics`, `insights`, `chart`, and `table` sections. Table sections can select columns and a row limit; the default limit is **100 rows**. `prepare(dataset, { baseline?, groupBy?, generatedAt? })` returns a `reportSnapshot`; `generatedAt` is omitted unless the caller supplies a valid Date or date string. Snapshot sections retain Dataset results, which serialize through `Dataset.toJSON()` when the snapshot is passed to `JSON.stringify`.
+
+```js
+import { createReportSpec } from 'numeriq';
+
+const report = createReportSpec({
+  title: 'Weekly sales report',
+  metricSet: kpis,
+  insightSet: insights,
+  sections: [
+    { id: 'summary', type: 'text', heading: 'Summary', text: 'KPI and exception review.' },
+    { id: 'kpis', type: 'metrics', metricIds: ['revenue', 'transactions'] },
+    { id: 'alerts', type: 'insights', severity: 'warning', limit: 10 },
+    { id: 'source-data', type: 'table', source: 'dataset', columns: ['Category', 'Total_Amount'], limit: 100 }
+  ]
+});
+
+const snapshot = report.prepare(currentSales, { baseline: previousSales });
+const jsonSnapshot = JSON.stringify(snapshot);
+```
+
+Both specs have versioned JSON documents and `toJSON()` / `fromJSON()` round-trips; dashboard/report prepared data is separate from the saved specification. `DashboardSpec` and `createDashboardSpec` are available from `numeriq/dashboard`; `ReportSpec` and `createReportSpec` are available from `numeriq/report` and the package root. A precomputed scorecard can also be passed as `scorecard` to `InsightSet.evaluate` to reuse the same MetricSet result. It must be the exact in-memory Dataset returned by the same MetricSet instance for that current Dataset, baseline object, and grouping; serialized or copied scorecards are rejected. v0.10 provides data preparation only—no dashboard UI, chart renderer, HTML, or PDF export.
+
 ## Statistics
 
 `count`, `sum`, `mean`, `median`, `min`, `max`, `range`, `variance`, and `std` remain available on datasets and `Series`. v0.6.0 adds `quantile(column, q)`, `percentile(column, p)`, `quartiles(column)`, `iqr(column)`, `mad(column)`, `skewness(column)`, and `kurtosis(column)`; `Series` exposes the same methods without the column argument. Statistics use finite numeric values and ignore missing or nonnumeric cells. Quantiles use linear interpolation by default; `method` may be `linear`, `lower`, `higher`, `midpoint`, or `nearest`. `quartiles()` returns `{ q1, median, q3 }`; MAD is the unscaled median absolute deviation.
@@ -338,7 +390,7 @@ In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display
 - `0.7.0` Metrics and KPIs: reusable serializable definitions, derived formulas, targets, baseline comparisons, and segmented scorecards returned as Datasets.
 - `0.8.0` Data intelligence and explainable insights: serializable deterministic rules, target-miss detection, user-defined KPI threshold/severity bands, grouped IQR/Z-score outlier rules, and evidence-backed Dataset findings.
 - `0.9.0` Visualization data and chart specifications: serializable renderer-neutral bar, line, and scatter specs; optional series grouping and aggregation; stable chart-ready Dataset preparation.
-- `0.10.0` Dashboard and reporting foundations.
+- `0.10.0` Dashboard and reporting foundations: versioned DashboardSpec layouts and ReportSpec sections composing MetricSet, InsightSet, and ChartSpec definitions into renderer-neutral, JSON-serializable prepared data.
 - `1.0.0` Stable integrated API.
 
 The roadmap is directional; features are not considered implemented until present in the corresponding release.

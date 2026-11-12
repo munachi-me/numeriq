@@ -89,6 +89,12 @@ export class AnalysisResult {
   groupBy(...columns: string[]): GroupedDataset;
   agg(specification: AggregationSpecification): AnalysisResult;
   aggregate(specification: AggregationSpecification): AnalysisResult;
+  join(right: JoinSide, options?: JoinOptions): AnalysisResult;
+  innerJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
+  leftJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
+  rightJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
+  fullJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
+  crossJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
   analyze(): AnalysisBuilder;
   lineage(): Lineage | null;
   history(): Lineage | null;
@@ -139,6 +145,17 @@ export class AnalysisBuilder {
   static fromJSON(document: AnalysisDocument, rows: Row[], columns: string[]): AnalysisBuilder;
 }
 
+export interface JoinOptions {
+  on?: string | string[];
+  leftOn?: string | string[];
+  rightOn?: string | string[];
+  how?: 'inner' | 'left' | 'right' | 'full' | 'cross';
+  suffixes?: [string, string];
+  validate?: 'one-to-one' | 'one-to-many' | 'many-to-one' | 'many-to-many';
+}
+
+export type JoinSide = Dataset | AnalysisResult | Row[];
+
 export interface AggregationOptions {
   as?: string;
   ddof?: number;
@@ -184,6 +201,12 @@ export class Dataset {
   analyze(): AnalysisBuilder;
   query(document: QueryDocument): AnalysisResult;
   toAnalysisResult(): AnalysisResult;
+  join(right: JoinSide, options?: JoinOptions): AnalysisResult;
+  innerJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
+  leftJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
+  rightJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
+  fullJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
+  crossJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
   addColumn(name: string, valueOrFunction: unknown): Dataset;
   addCalculatedColumn(name: string, expression: unknown): Dataset;
   addConditionalColumn(name: string, condition: Condition, thenValue: unknown, elseValue: unknown): Dataset;

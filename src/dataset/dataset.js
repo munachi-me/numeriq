@@ -10,6 +10,7 @@ import { GroupedDataset } from './grouping.js';
 import { AnalysisBuilder } from './analysis.js';
 import { AnalysisResult } from './analysis-result.js';
 import { createQuery, compileCondition } from './query.js';
+import { executeJoin, toJoinContext } from './joins.js';
 import { evaluateExpression } from './expressions.js';
 
 const INSPECT = Symbol.for('nodejs.util.inspect.custom');
@@ -152,6 +153,17 @@ export class Dataset {
       (rows, resultColumns, name) => new Dataset(rows, { columns: resultColumns, name }));
   }
   analyze() { return new AnalysisBuilder(this.rows, this.#columns, this.name, this.#lineageValue()); }
+  join(right, options = {}) { return this.#joinWith(right, options); }
+  innerJoin(right, options = {}) { return this.#joinWith(right, { ...options, how: 'inner' }); }
+  leftJoin(right, options = {}) { return this.#joinWith(right, { ...options, how: 'left' }); }
+  rightJoin(right, options = {}) { return this.#joinWith(right, { ...options, how: 'right' }); }
+  fullJoin(right, options = {}) { return this.#joinWith(right, { ...options, how: 'full' }); }
+  crossJoin(right, options = {}) { return this.#joinWith(right, { ...options, how: 'cross' }); }
+  #joinWith(right, options) {
+    const result = executeJoin(toJoinContext(this, 'Left join input'), toJoinContext(right, 'Right join input'), options);
+    const lineage = { ...this.#lineageValue(), operation: `join:${options.how ?? 'inner'}` };
+    return new AnalysisResult(result.rows, result.columns, { lineage });
+  }
   query(document) {
     const result = createQuery(document).run(this);
     return this.#analysisResult(result.rows, result.columns);

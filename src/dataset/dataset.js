@@ -4,26 +4,31 @@ import { normalizeValue, inferType, cloneValue, castValue } from '../utils/value
 import { renderTable } from '../display/table.js';
 import { Series } from './series.js';
 import * as stats from '../stats/descriptive.js';
-import { NORMALIZED_ROWS } from '../internal.js';
+import { NORMALIZED_ROWS, LINEAGE } from '../internal.js';
 import { extractDatePart as getDatePart } from '../utils/temporal.js';
 import { GroupedDataset } from './grouping.js';
+import { AnalysisBuilder } from './analysis.js';
+import { AnalysisResult } from './analysis-result.js';
+import { createQuery, compileCondition } from './query.js';
 import { evaluateExpression } from './expressions.js';
-import { compileCondition } from './query.js';
 
 const INSPECT = Symbol.for('nodejs.util.inspect.custom');
 const isRecord = v => v !== null && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date);
 
 export class Dataset {
-  #rows; #columns; #options;
+  #rows; #columns; #options; #lineage;
   constructor(rows, options = {}) {
     if (!Array.isArray(rows)) throw new ValidationError('Dataset rows must be an array.');
     const { importReport = null, ...datasetOptions } = options;
     const normalized = options[NORMALIZED_ROWS] === true;
     delete datasetOptions[NORMALIZED_ROWS];
+    const lineage = datasetOptions[LINEAGE] ?? null;
+    delete datasetOptions[LINEAGE];
     this.#options = { ...datasetOptions };
     const columns = options.columns ? [...options.columns] : [...new Set(rows.flatMap(r => isRecord(r) ? Object.keys(r) : []))];
     if (!columns.length && rows.length && rows.every(Array.isArray)) throw new ValidationError('Provide columns when creating a dataset from arrays of arrays.');
     if (rows.some(r => !isRecord(r) && !Array.isArray(r))) throw new ValidationError('Each row must be an object or an array.');
+    this.#lineage = lineage;
     this.#columns = columns;
     this.#rows = rows.map((row, i) => {
       const source = Array.isArray(row) ? Object.fromEntries(columns.map((c,j)=>[c,row[j] ?? null])) : row;
@@ -47,6 +52,13 @@ export class Dataset {
   get dtypes() { return Object.fromEntries(this.#columns.map(c=>[c,inferType(this.#rows.map(r=>r[c]))])); }
   get schema() { return Object.fromEntries(this.#columns.map(c=>[c,{name:c,type:inferType(this.#rows.map(r=>r[c])),nullable:this.#rows.some(r=>r[c] == null)}])); }
   #new(rows, columns=this.#columns) { return new Dataset(rows,{...this.#options,columns,name:this.name,metadata:this.metadata,[NORMALIZED_ROWS]:true}); }
+  #analysisResult(rows, columns) {
+    return new AnalysisResult(rows, columns, { lineage: this.#lineageValue() });
+  }
+  #lineageValue() {
+    if (this.#lineage) return cloneValue(this.#lineage);
+    return { source: this.name, sourceId: this.id, createdAt: this.createdAt.toISOString() };
+  }
   head(n=5) { return this.#new(this.#rows.slice(0,validCount(n))); }
   tail(n=5) { const count=validCount(n); return this.#new(count===0?[]:this.#rows.slice(-count)); }
   preview(n=10) { return this.head(n); }
@@ -139,6 +151,12 @@ export class Dataset {
     return new GroupedDataset(this.rows, this.#columns, keys, this.name,
       (rows, resultColumns, name) => new Dataset(rows, { columns: resultColumns, name }));
   }
+  analyze() { return new AnalysisBuilder(this.rows, this.#columns, this.name, this.#lineageValue()); }
+  query(document) {
+    const result = createQuery(document).run(this);
+    return this.#analysisResult(result.rows, result.columns);
+  }
+  toAnalysisResult() { return this.#analysisResult(this.rows, this.#columns); }
   addColumn(name,valueOrFunction) { const target=validColumnName(name); if(this.#columns.includes(target)) throw new ValidationError(`Invalid or existing column: ${target}`); const cols=[...this.#columns,target]; const rows=this.#rows.map((r,i)=>({...r,[target]:typeof valueOrFunction==='function'?normalizeValue(valueOrFunction({...r},i),this.#options.normalization):normalizeValue(valueOrFunction,this.#options.normalization)})); return this.#new(rows,cols); }
   addCalculatedColumn(name, expression) {
     const target = validColumnName(name);

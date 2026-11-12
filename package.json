@@ -1,6 +1,6 @@
 {
   "name": "numeriq",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "A lightweight JavaScript data science engine.",
   "type": "module",
   "main": "./src/index.js",
@@ -9,6 +9,9 @@
     "./dataset": "./src/dataset/dataset.js",
     "./pipeline": "./src/dataset/pipeline.js",
     "./query": "./src/dataset/query.js",
+    "./analysis": "./src/dataset/analysis.js",
+    "./analysis-result": "./src/dataset/analysis-result.js",
+    "./aggregation-helpers": "./src/dataset/aggregation-helpers.js",
     "./grouping": "./src/dataset/grouping.js",
     "./metrics": "./src/dataset/metrics.js",
     "./insights": "./src/dataset/insights.js",
@@ -27,5 +30,5 @@
   },
   "engines": { "node": ">=20" },
   "license": "MIT",
-  "files": ["src", "dataset/samples", "README.md", "LICENSE", "CHANGELOG.md"]
+  "files": ["src", "dataset/samples", "index.d.ts", "README.md", "LICENSE", "CHANGELOG.md"]
 }

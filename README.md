@@ -2,7 +2,7 @@
 
 **JavaScript Data Science Engine** — a lightweight, framework-independent foundation for working with tabular data in JavaScript.
 
-> Version 0.10.0 adds serializable DashboardSpec and ReportSpec compositions over KPIs, insights, chart specifications, and Dataset results. Output is renderer-neutral; Numeriq remains an early development build, not yet a production-stability promise.
+> Version 0.11.0 adds the Analysis Engine: a lightweight `AnalysisResult`, a fluent `analyze()` builder, SQL-inspired query operations, the full aggregation catalog with conditional aggregations, lineage, and an improved 1000-row-default table output. Output is renderer-neutral; Numeriq remains an early development build, not yet a production-stability promise.
 
 ## Requirements
 
@@ -289,6 +289,41 @@ console.log(chartData); // Dataset columns: Category, Total_Amount, Product
 
 Groups remain in first-seen order unless `sort: { by: 'x' | 'y' | 'series', direction: 'asc' | 'desc' }` is provided; sorting is stable and nulls remain last. Common `options` are `legend` and `grid`. Bar charts also accept `stacked` and `orientation: 'vertical' | 'horizontal'`; line charts accept `connectNulls`; scatter charts accept a positive `pointSize`. Invalid fields and chart-specific options are rejected. Serialize with `JSON.stringify(spec)` and restore with `ChartSpec.fromJSON(document)` or `createChartSpec(document)`. The API is also exported from `numeriq/charts`, and prepared chart data can come from any Dataset, including v0.7 scorecards and v0.8 findings.
 
+## Analysis engine (v0.11.0)
+
+Version 0.11.0 introduces a proper analytical engine with a clear distinction between original datasets and analytical results.
+
+**Dataset vs AnalysisResult.** `Dataset` remains the original, full-featured table: profiling, descriptions, import reports, metadata, and schema inspection. `AnalysisResult` is the lightweight tabular result produced by an analytical operation. It exposes only the tabular surface — `rows`, `columns`, `shape`, `ndim`, `length`, `size`, `empty`, `index`, `dtypes`, `schema`, `head()`, `tail()`, `select()`, `filter()`, `sort()`/`sortBy()`, `limit()`, `distinct()`, `count()`, `groupBy()`, `agg()`, `table()`, `toJSON()`, `toArray()` — and never exposes `profile()`, `importReport`, or original dataset identity. Every tabular operation returns a new `AnalysisResult` and sources are never mutated.
+
+**Fluent analysis builder.** `dataset.analyze()` starts a readable, SQL-inspired analysis:
+
+```js
+const result = sales
+  .analyze()
+  .groupBy('month')
+  .sum('amount', { as: 'totalSales' })
+  .mean('amount', { as: 'averageSales' })
+  .count()
+  .execute();
+
+result.table();          // SQL-style table with a 'Showing X of Y rows.' footer
+result.filter({ op: 'gt', column: 'totalSales', value: 200 }); // composable
+```
+
+Steps recorded before the first aggregation filter, project, order, page, or deduplicate the source rows; steps recorded after it (`having`, `orderBy`, `limit`, `offset`, `select`, `distinct`) operate on the aggregated output. Global aggregation without `groupBy()` produces a single summary row. Conditional aggregations filter contributing rows per aggregation: `.sum('amount', { as: 'bigSales', where: { op: 'gte', column: 'amount', value: 100 } })`. Direct chaining with aggregation helpers is also supported and preserves the existing `GroupedDataset`/`agg()` behavior: `sales.groupBy('month').agg({ totalSales: sum('amount'), transactions: count() })`.
+
+**Aggregations.** `sum`, `mean`/`average`, `median`, `min`, `max`, `count`, `countRows`, `nunique`, `variance`, `std`/`stddev`, `range`, `quantile`, `percentile`, `quartiles`, `iqr`, `mad`, `skewness`, `kurtosis` — each with aliases, custom output names via `as`, `ddof`/`q`/`p`/`method` options, multiple functions per operation, and global use without grouping.
+
+**Query operations.** `select()`, `where()`/`filter()`, `groupBy()`, `having()`, `orderBy()`/`sort()`, `limit()`, `offset()`, and `distinct()` accept both predicate functions and the declarative condition objects from v0.4.0 (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `contains`, `startsWith`, `endsWith`, `isNull`, `isNotNull`, `and`, `or`, `not`, `between` via nested comparisons). The fluent JavaScript interface is primary; `AnalysisBuilder.toJSON()` produces a versioned declarative document and `AnalysisBuilder.fromJSON()` replays it, preparing the architecture for a future SQL-string interface (no SQL strings are claimed or supported).
+
+**Lineage.** Derived results carry lightweight provenance — `result.lineage()` / `result.history()` returns the source name and the recorded step list without copying import reports or original metadata.
+
+**Table output.** The default `maxRows` for `table()`/`toTable()` is now 1000 (custom values and `Infinity` are accepted, invalid values are rejected), with a `Showing 5 of 2500 rows.` footer and the SQL-style `idx` identifier. Behavior is consistent between `Dataset` and `AnalysisResult` display, `print()`, and Node inspection.
+
+**Backward compatibility.** Existing scalar methods (`sales.sum('amount')`, `sales.mean('amount')`, `sales.min('amount')`) still return scalars. `Dataset.groupBy().agg()` still returns a `Dataset`; aggregating an `AnalysisResult` returns an `AnalysisResult`. Existing `Dataset`, `GroupedDataset`, `Series`, metrics, charts, dashboards, and reporting behavior is unchanged. A default export now mirrors the named exports: `import Numeriq from 'numeriq'` alongside `import { createDataset } from 'numeriq'`.
+
+**TypeScript declarations.** `index.d.ts` declares the public API — `Dataset`, `AnalysisResult`, `AnalysisBuilder`, `GroupedDataset`, `Series`, aggregation helpers, and analysis methods — without migrating the runtime to TypeScript. The full join engine is deferred to v0.12.0; the result factory architecture is now in place for it.
+
 ## Dashboards and reports (v0.10.0)
 
 `createDashboardSpec(definition)` composes existing MetricSet, InsightSet, and ChartSpec definitions into a renderer-neutral dashboard layout. It stores only the serializable definitions and layout—not the source Dataset. `prepare(dataset, { baseline?, groupBy? })` evaluates the required scorecard and findings once, then returns a `dashboardData` object whose panels contain their prepared Dataset results.
@@ -391,6 +426,8 @@ In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display
 - `0.8.0` Data intelligence and explainable insights: serializable deterministic rules, target-miss detection, user-defined KPI threshold/severity bands, grouped IQR/Z-score outlier rules, and evidence-backed Dataset findings.
 - `0.9.0` Visualization data and chart specifications: serializable renderer-neutral bar, line, and scatter specs; optional series grouping and aggregation; stable chart-ready Dataset preparation.
 - `0.10.0` Dashboard and reporting foundations: versioned DashboardSpec layouts and ReportSpec sections composing MetricSet, InsightSet, and ChartSpec definitions into renderer-neutral, JSON-serializable prepared data.
+- `0.11.0` Analysis engine: lightweight AnalysisResult, fluent analyze() builder with SQL-inspired query operations, full aggregation catalog with conditional aggregations and aliases, composable immutable results, lightweight lineage, default + named exports, 1000-row table default with row-count footer, and TypeScript declarations for the public API.
+- `0.12.0` Dataset joins and relationships (planned): inner/left/right/full/cross joins, multiple and differently named keys, collision suffixes, and relationship validation.
 - `1.0.0` Stable integrated API.
 
 The roadmap is directional; features are not considered implemented until present in the corresponding release.

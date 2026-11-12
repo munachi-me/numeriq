@@ -268,3 +268,30 @@ const salesReportSpec = createReportSpec({
 const salesReportSnapshot = salesReportSpec.prepare(currentSales, { baseline: baselineSales });
 console.log('V0.10 REPORT SPEC:', JSON.stringify(salesReportSpec));
 console.log('V0.10 JSON REPORT SNAPSHOT BYTES:', Buffer.byteLength(JSON.stringify(salesReportSnapshot), 'utf8'));
+
+// V0.11: Analysis engine — fluent builder, aggregations, composable results
+const monthlyAnalysis = currentSales.analyze()
+  .groupBy('Category')
+  .sum('Total_Amount', { as: 'totalRevenue' })
+  .mean('Total_Amount', { as: 'averageOrder' })
+  .countRows({ as: 'orders' })
+  .orderBy('totalRevenue', 'desc')
+  .execute();
+console.log('V0.11 FLUENT ANALYSIS (AnalysisResult):');
+console.log(monthlyAnalysis.table());
+
+const bigOrders = currentSales.analyze()
+  .where({ op: 'gte', column: 'Total_Amount', value: 100 })
+  .groupBy('Category')
+  .sum('Total_Amount', { as: 'bigRevenue', where: { op: 'gte', column: 'Total_Amount', value: 200 } })
+  .having({ op: 'gt', column: 'bigRevenue', value: 0 })
+  .execute();
+console.log('V0.11 CONDITIONAL AGGREGATION:', bigOrders.rows);
+
+console.log('V0.11 GLOBAL SUMMARY:', currentSales.analyze()
+  .sum('Total_Amount', { as: 'grandTotal' })
+  .countRows({ as: 'orders' })
+  .execute().rows);
+
+console.log('V0.11 LINEAGE:', JSON.stringify(monthlyAnalysis.lineage()));
+console.log('V0.11 SCALAR PRESERVED: sum =', currentSales.sum('Total_Amount'), '| mean =', currentSales.mean('Total_Amount'));

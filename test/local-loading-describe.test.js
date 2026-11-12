@@ -110,9 +110,11 @@ test('wide table display bounds the visible columns while retaining dimensions',
   assert.match(table, /1 rows × 25 columns/);
 });
 
-test('table display defaults to 100 rows and validates explicit maxRows', () => {
-  const dataset = createDataset(Array.from({ length: 101 }, (_, index) => ({ value: index })));
-  assert.match(dataset.toTable(), /… 1 more rows/);
-  assert.match(dataset.toTable({ maxRows: 10 }), /… 91 more rows/);
+test('table display defaults to 1000 rows, supports custom and Infinity maxRows, and validates invalid values', () => {
+  const dataset = createDataset(Array.from({ length: 1001 }, (_, index) => ({ value: index })));
+  assert.match(dataset.toTable(), /Showing 1000 of 1001 rows/);
+  assert.match(dataset.toTable({ maxRows: 10 }), /Showing 10 of 1001 rows/);
+  assert.match(dataset.toTable({ maxRows: Infinity }), /Showing 1001 of 1001 rows/);
   assert.throws(() => dataset.toTable({ maxRows: -1 }), /maxRows/);
+  assert.throws(() => dataset.toTable({ maxRows: 2.5 }), /maxRows/);
 });

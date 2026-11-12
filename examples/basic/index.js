@@ -295,3 +295,32 @@ console.log('V0.11 GLOBAL SUMMARY:', currentSales.analyze()
 
 console.log('V0.11 LINEAGE:', JSON.stringify(monthlyAnalysis.lineage()));
 console.log('V0.11 SCALAR PRESERVED: sum =', currentSales.sum('Total_Amount'), '| mean =', currentSales.mean('Total_Amount'));
+
+// V0.12: Joins and relationships — combine datasets as naturally as SQL
+const salesWithCustomer = currentSales.addColumn('customerId', row => (row.Transaction_ID % 3) + 1);
+const customers = [
+  { customerId: 1, name: 'Ada', tier: 'gold' },
+  { customerId: 2, name: 'Bo', tier: 'silver' },
+  { customerId: 3, name: 'Cy', tier: 'bronze' }
+];
+const enriched = salesWithCustomer.leftJoin(customers, { on: 'customerId', suffixes: ['_sales', '_cust'] });
+console.log('V0.12 LEFT JOIN WITH SUFFIXES:');
+console.log(enriched.table());
+
+const lookup = createDataset([
+  { tier: 'gold', perks: 'priority support' },
+  { tier: 'silver', perks: 'email support' },
+  { tier: 'bronze', perks: 'community support' }
+]);
+const withPerks = enriched.analyze()
+  .where({ op: 'isNotNull', column: 'tier' })
+  .groupBy('tier')
+  .sum('Total_Amount', { as: 'revenue' })
+  .execute()
+  .innerJoin(lookup, { on: 'tier', validate: 'one-to-one' });
+console.log('V0.12 COMPOSED JOIN + ANALYSIS CHAIN:', withPerks.rows);
+
+console.log('V0.12 MANY-TO-ONE VALIDATION OK:', salesWithCustomer.join(
+  createDataset(customers.map(c => ({ customerId: c.customerId, tier: c.tier }))),
+  { on: 'customerId', how: 'inner', validate: 'many-to-one' }
+).length, 'rows matched');

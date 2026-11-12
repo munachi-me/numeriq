@@ -2,7 +2,7 @@
 
 **JavaScript Data Science Engine** — a lightweight, framework-independent foundation for working with tabular data in JavaScript.
 
-> Version 0.11.0 adds the Analysis Engine: a lightweight `AnalysisResult`, a fluent `analyze()` builder, SQL-inspired query operations, the full aggregation catalog with conditional aggregations, lineage, and an improved 1000-row-default table output. Output is renderer-neutral; Numeriq remains an early development build, not yet a production-stability promise.
+> Version 0.12.0 adds dataset joins and relationships: inner, left, right, full, and cross joins with multiple/differently named keys, configurable collision suffixes, relationship validation, hash-based execution, and composable `AnalysisResult` output. Output is renderer-neutral; Numeriq remains an early development build, not yet a production-stability promise.
 
 ## Requirements
 
@@ -289,6 +289,28 @@ console.log(chartData); // Dataset columns: Category, Total_Amount, Product
 
 Groups remain in first-seen order unless `sort: { by: 'x' | 'y' | 'series', direction: 'asc' | 'desc' }` is provided; sorting is stable and nulls remain last. Common `options` are `legend` and `grid`. Bar charts also accept `stacked` and `orientation: 'vertical' | 'horizontal'`; line charts accept `connectNulls`; scatter charts accept a positive `pointSize`. Invalid fields and chart-specific options are rejected. Serialize with `JSON.stringify(spec)` and restore with `ChartSpec.fromJSON(document)` or `createChartSpec(document)`. The API is also exported from `numeriq/charts`, and prepared chart data can come from any Dataset, including v0.7 scorecards and v0.8 findings.
 
+## Dataset joins and relationships (v0.12.0)
+
+Joins combine two tabular inputs — `Dataset`, `AnalysisResult`, or plain arrays of row objects — and always return a composable `AnalysisResult`, so join output chains directly into `analyze()`, `filter()`, `groupBy()`, and the rest of the v0.11.0 analysis API. Available on both `Dataset` and `AnalysisResult`: `join(right, options)`, `innerJoin()`, `leftJoin()`, `rightJoin()`, `fullJoin()`, and `crossJoin()`.
+
+```js
+sales.join(customers, { on: 'customerId', how: 'left' });
+sales.join(customers, { on: ['customerId', 'region'], how: 'inner' });   // multiple keys
+sales.join(customers, { leftOn: 'customerId', rightOn: 'id' });          // different key names
+sales.join(customers, { on: 'customerId', suffixes: ['_sales', '_customers'] });
+sales.join(customers, { on: 'customerId', validate: 'many-to-one' });
+```
+
+**Key options.** `on` accepts one key or an array of shared keys; `leftOn`/`rightOn` accept one or more differently named keys per side (equal count required). The two forms cannot be mixed. Cross joins take no keys and reject them.
+
+**Column collisions.** Columns with identical names on both sides never silently overwrite: non-key collisions get configurable `suffixes` (default `['_left', '_right']`), shared key columns appear once (left values), and right-only key columns from `rightOn` are dropped in favor of their left partners. Suffixes that would produce duplicate output names are rejected with an explicit error.
+
+**Relationship validation.** `validate: 'one-to-one' | 'one-to-many' | 'many-to-one' | 'many-to-many'` checks key uniqueness on the appropriate side before joining and throws a descriptive error on unexpected duplicates.
+
+**Nulls, unmatched rows, and empty inputs.** Null or missing join keys never match anything (including other nulls) but are preserved on left/right/full joins with null-filled opposite-side columns; unmatched rows keep their own side's values. Duplicate keys multiply matched rows (standard SQL semantics). Empty inputs produce empty or one-sided results per join type.
+
+**Performance and ordering.** Joins use hash indexing rather than nested loops. Matched output preserves left row order (inner/left/full) or right row order (right); unmatched rows from full/right joins are appended in source order after the matched section; cross join follows left-then-right nested order.
+
 ## Analysis engine (v0.11.0)
 
 Version 0.11.0 introduces a proper analytical engine with a clear distinction between original datasets and analytical results.
@@ -427,7 +449,7 @@ In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display
 - `0.9.0` Visualization data and chart specifications: serializable renderer-neutral bar, line, and scatter specs; optional series grouping and aggregation; stable chart-ready Dataset preparation.
 - `0.10.0` Dashboard and reporting foundations: versioned DashboardSpec layouts and ReportSpec sections composing MetricSet, InsightSet, and ChartSpec definitions into renderer-neutral, JSON-serializable prepared data.
 - `0.11.0` Analysis engine: lightweight AnalysisResult, fluent analyze() builder with SQL-inspired query operations, full aggregation catalog with conditional aggregations and aliases, composable immutable results, lightweight lineage, default + named exports, 1000-row table default with row-count footer, and TypeScript declarations for the public API.
-- `0.12.0` Dataset joins and relationships (planned): inner/left/right/full/cross joins, multiple and differently named keys, collision suffixes, and relationship validation.
+- `0.12.0` Dataset joins and relationships: inner/left/right/full/cross joins on Dataset, AnalysisResult, and array inputs; multiple and differently named keys; configurable collision suffixes with overwrite prevention; one-to-one/one-to-many/many-to-one/many-to-many validation; consistent null, unmatched, duplicate-key, and empty-input behavior; hash-based execution with documented ordering; composable AnalysisResult output.
 - `1.0.0` Stable integrated API.
 
 The roadmap is directional; features are not considered implemented until present in the corresponding release.

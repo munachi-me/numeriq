@@ -4,6 +4,8 @@ import { renderTable } from '../display/table.js';
 import { normalizeAggregations, computeAggregation } from './aggregations.js';
 import { compileCondition } from './query.js';
 import { GroupedDataset } from './grouping.js';
+import { AnalysisBuilder } from './analysis.js';
+import { executeJoin, toJoinContext } from './joins.js';
 
 const INSPECT = Symbol.for('nodejs.util.inspect.custom');
 const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
@@ -120,6 +122,22 @@ export class AnalysisResult {
   aggregate(specification) { return this.agg(specification); }
 
   analyze() { return new AnalysisBuilder(this.rows, this.#columns, this.name ?? 'AnalysisResult', this.#lineageValue()); }
+
+  join(right, options = {}) { return this.#joinWith(right, options); }
+  innerJoin(right, options = {}) { return this.#joinWith(right, { ...options, how: 'inner' }); }
+  leftJoin(right, options = {}) { return this.#joinWith(right, { ...options, how: 'left' }); }
+  rightJoin(right, options = {}) { return this.#joinWith(right, { ...options, how: 'right' }); }
+  fullJoin(right, options = {}) { return this.#joinWith(right, { ...options, how: 'full' }); }
+  crossJoin(right, options = {}) { return this.#joinWith(right, { ...options, how: 'cross' }); }
+  #joinWith(right, options) {
+    const result = executeJoin(
+      toJoinContext({ rows: this.rows, columns: this.#columns, name: 'AnalysisResult' }, 'Left join input'),
+      toJoinContext(right, 'Right join input'),
+      options
+    );
+    const lineage = { ...(this.#lineageValue() ?? { source: 'AnalysisResult' }), operation: `join:${options.how ?? 'inner'}` };
+    return new AnalysisResult(result.rows, result.columns, { lineage });
+  }
 
   lineage() { return this.#lineage ? cloneValue(this.#lineage) : null; }
   history() { return this.lineage(); }

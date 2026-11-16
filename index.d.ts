@@ -95,6 +95,7 @@ export class AnalysisResult {
   rightJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
   fullJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
   crossJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
+  window(seed?: WindowSeed): WindowBuilder;
   analyze(): AnalysisBuilder;
   lineage(): Lineage | null;
   history(): Lineage | null;
@@ -156,6 +157,73 @@ export interface JoinOptions {
 
 export type JoinSide = Dataset | AnalysisResult | Row[];
 
+export interface WindowSeed {
+  version?: number;
+  partitionBy?: string | string[];
+  orderBy?: string | Array<{ column: string; direction?: 'asc' | 'desc' }>;
+  functions?: WindowFunctionDescriptor[];
+}
+
+export interface WindowFunctionDescriptor {
+  kind:
+    | 'rowNumber' | 'rank' | 'denseRank' | 'percentRank' | 'cumeDist' | 'ntile'
+    | 'lag' | 'lead' | 'firstValue' | 'lastValue' | 'nthValue'
+    | 'cumulativeSum' | 'cumulativeMean' | 'cumulativeMin' | 'cumulativeMax' | 'cumulativeCount'
+    | 'rollingMean' | 'rollingSum' | 'rollingMin' | 'rollingMax' | 'rollingStd'
+    | 'pctChange';
+  column?: string;
+  as?: string;
+  buckets?: number;
+  offset?: number;
+  n?: number;
+  periods?: number;
+  window?: number;
+  minPeriods?: number;
+  default?: unknown;
+}
+
+export interface WindowOptions {
+  as?: string;
+  offset?: number;
+  default?: unknown;
+  n?: number;
+  periods?: number;
+  window?: number;
+  minPeriods?: number;
+}
+
+export class WindowBuilder {
+  constructor(rows: Row[], columns: string[], sourceName?: string, lineage?: Lineage | null, seed?: WindowSeed);
+  partitionBy(...columns: string[]): this;
+  orderBy(column: string, direction?: 'asc' | 'desc'): this;
+  rowNumber(options?: WindowOptions): this;
+  rank(options?: WindowOptions): this;
+  denseRank(options?: WindowOptions): this;
+  percentRank(options?: WindowOptions): this;
+  cumeDist(options?: WindowOptions): this;
+  ntile(buckets: number, options?: WindowOptions): this;
+  lag(column: string, options?: WindowOptions): this;
+  lead(column: string, options?: WindowOptions): this;
+  firstValue(column: string, options?: WindowOptions): this;
+  lastValue(column: string, options?: WindowOptions): this;
+  nthValue(column: string, options?: WindowOptions): this;
+  cumulativeSum(column: string, options?: WindowOptions): this;
+  cumulativeMean(column: string, options?: WindowOptions): this;
+  cumulativeMin(column: string, options?: WindowOptions): this;
+  cumulativeMax(column: string, options?: WindowOptions): this;
+  cumulativeCount(column: string, options?: WindowOptions): this;
+  rollingMean(column: string, options?: WindowOptions): this;
+  rollingSum(column: string, options?: WindowOptions): this;
+  rollingMin(column: string, options?: WindowOptions): this;
+  rollingMax(column: string, options?: WindowOptions): this;
+  rollingStd(column: string, options?: WindowOptions): this;
+  pctChange(column: string, options?: WindowOptions): this;
+  growthRate(column: string, options?: WindowOptions): this;
+  execute(): AnalysisResult;
+  toJSON(): WindowSeed;
+  static fromJSON(document: WindowSeed, rows: Row[], columns: string[], sourceName?: string): WindowBuilder;
+}
+
 export interface AggregationOptions {
   as?: string;
   ddof?: number;
@@ -207,6 +275,7 @@ export class Dataset {
   rightJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
   fullJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
   crossJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
+  window(seed?: WindowSeed): WindowBuilder;
   addColumn(name: string, valueOrFunction: unknown): Dataset;
   addCalculatedColumn(name: string, expression: unknown): Dataset;
   addConditionalColumn(name: string, condition: Condition, thenValue: unknown, elseValue: unknown): Dataset;

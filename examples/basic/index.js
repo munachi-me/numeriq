@@ -324,3 +324,21 @@ console.log('V0.12 MANY-TO-ONE VALIDATION OK:', salesWithCustomer.join(
   createDataset(customers.map(c => ({ customerId: c.customerId, tier: c.tier }))),
   { on: 'customerId', how: 'inner', validate: 'many-to-one' }
 ).length, 'rows matched');
+
+// V0.13: Window functions — calculations across rows without collapsing them
+const salesWithDates = currentSales.addColumn('customerId', row => (row.Transaction_ID % 3) + 1);
+const windowed = salesWithDates.window()
+  .partitionBy('Category')
+  .orderBy('Date')
+  .rowNumber({ as: 'sequenceInCategory' })
+  .cumulativeSum('Total_Amount', { as: 'runningRevenue' })
+  .rollingMean('Total_Amount', { window: 3, as: 'threeTransactionAverage' })
+  .pctChange('Total_Amount', { as: 'changeVsPrevious' })
+  .execute();
+console.log('V0.13 WINDOW FUNCTIONS (rows preserved, source order kept):');
+console.log(windowed.table({ maxRows: 8 }));
+
+const windowDoc = salesWithDates.window().partitionBy('Category').orderBy('Date').rank({ as: 'revenueRank' }).toJSON();
+console.log('V0.13 DECLARATIVE WINDOW DOC:', JSON.stringify(windowDoc));
+const replayed = salesWithDates.window(windowDoc).execute();
+console.log('V0.13 REPLAYED RANKS:', replayed.rows.slice(0, 3).map(row => ({ category: row.Category, revenueRank: row.revenueRank })));

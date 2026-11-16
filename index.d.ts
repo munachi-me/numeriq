@@ -96,6 +96,11 @@ export class AnalysisResult {
   fullJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
   crossJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
   window(seed?: WindowSeed): WindowBuilder;
+  pivot(options: PivotOptions): AnalysisResult;
+  melt(options?: MeltOptions): AnalysisResult;
+  crosstab(rowColumn: string, columnColumn: string, options?: CrosstabOptions): AnalysisResult;
+  transpose(options?: { labelColumn?: string }): AnalysisResult;
+  explode(column: string): AnalysisResult;
   analyze(): AnalysisBuilder;
   lineage(): Lineage | null;
   history(): Lineage | null;
@@ -192,6 +197,33 @@ export interface WindowOptions {
   minPeriods?: number;
 }
 
+export interface PivotOptions {
+  index: string | string[];
+  columns: string;
+  values: string;
+  agg?: AggregationDescriptor['op'];
+  fillValue?: unknown;
+  ddof?: number;
+  q?: number;
+  p?: number;
+  method?: 'linear' | 'lower' | 'higher' | 'midpoint' | 'nearest';
+}
+
+export interface MeltOptions {
+  idVars?: string | string[];
+  valueVars?: string | string[];
+  varName?: string;
+  valueName?: string;
+}
+
+export interface CrosstabOptions {
+  values?: string;
+  agg?: AggregationDescriptor['op'];
+  percentBy?: 'none' | 'row' | 'column' | 'total';
+  totals?: boolean;
+  totalName?: string;
+}
+
 export class WindowBuilder {
   constructor(rows: Row[], columns: string[], sourceName?: string, lineage?: Lineage | null, seed?: WindowSeed);
   partitionBy(...columns: string[]): this;
@@ -276,6 +308,11 @@ export class Dataset {
   fullJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
   crossJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
   window(seed?: WindowSeed): WindowBuilder;
+  pivot(options: PivotOptions): AnalysisResult;
+  melt(options?: MeltOptions): AnalysisResult;
+  crosstab(rowColumn: string, columnColumn: string, options?: CrosstabOptions): AnalysisResult;
+  transpose(options?: { labelColumn?: string }): AnalysisResult;
+  explode(column: string): AnalysisResult;
   addColumn(name: string, valueOrFunction: unknown): Dataset;
   addCalculatedColumn(name: string, expression: unknown): Dataset;
   addConditionalColumn(name: string, condition: Condition, thenValue: unknown, elseValue: unknown): Dataset;

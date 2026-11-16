@@ -2,7 +2,7 @@
 
 **JavaScript Data Science Engine** — a lightweight, framework-independent foundation for working with tabular data in JavaScript.
 
-> Version 0.13.0 adds window functions and advanced analytics: a `window()` builder with ranking, offset, cumulative, rolling, and time-based calculations across partitions — every function appends a column without removing rows. Output is renderer-neutral; Numeriq remains an early development build, not yet a production-stability promise.
+> Version 0.14.0 adds data reshaping: `pivot()` from long to wide form with configurable aggregation, `melt()` from wide to long form, `crosstab()` frequency/percentage analysis, plus `transpose()` and `explode()` — all returning composable `AnalysisResult` output. Output is renderer-neutral; Numeriq remains an early development build, not yet a production-stability promise.
 
 ## Requirements
 
@@ -289,6 +289,26 @@ console.log(chartData); // Dataset columns: Category, Total_Amount, Product
 
 Groups remain in first-seen order unless `sort: { by: 'x' | 'y' | 'series', direction: 'asc' | 'desc' }` is provided; sorting is stable and nulls remain last. Common `options` are `legend` and `grid`. Bar charts also accept `stacked` and `orientation: 'vertical' | 'horizontal'`; line charts accept `connectNulls`; scatter charts accept a positive `pointSize`. Invalid fields and chart-specific options are rejected. Serialize with `JSON.stringify(spec)` and restore with `ChartSpec.fromJSON(document)` or `createChartSpec(document)`. The API is also exported from `numeriq/charts`, and prepared chart data can come from any Dataset, including v0.7 scorecards and v0.8 findings.
 
+## Data reshaping (v0.14.0)
+
+Reshaping operations restructure tabular data for analysis and visualization. All are available on `Dataset` and `AnalysisResult`, return composable `AnalysisResult` objects with reshaping-aware lineage, never mutate their sources, and handle empty datasets.
+
+```js
+sales.pivot({ index: 'month', columns: 'product', values: 'revenue', agg: 'sum' });
+data.melt({ idVars: ['region'], valueVars: ['January', 'February', 'March'], varName: 'month', valueName: 'sales' });
+data.crosstab('region', 'product');
+```
+
+**Pivot** — long form to wide form. One output row per distinct index combination (first-seen order) and one output column per distinct value of the `columns` field. Multiple records mapping to the same cell are combined with `agg` (the full aggregation catalog is supported, including `ddof`/`q`/`p`/`method` options); missing combinations get `fillValue` (default null); null pivot keys become their own column.
+
+**Melt** — wide form to long form. One output row per (source row, value variable) with `varName`/`valueName` output columns (defaults `variable`/`value`); `valueVars` defaults to the complement of `idVars`; null values are preserved; id/value variables may not overlap and output names must be unique.
+
+**Crosstab** — frequency and cross-tabulation. Counts rows per combination by default, or aggregates `values` with `agg`. `percentBy: 'row' | 'column' | 'total'` converts cells to fractions (rows keep their raw count in the totals cell; the grand-total cell is always 1 when percentage-based). `totals: true` (default) appends a totals row and column named via `totalName` (default 'All').
+
+**Transpose and explode** — `transpose({ labelColumn })` exchanges rows and columns (one output row per original column, labeled via `labelColumn`, default 'field'); `explode(column)` fans array values into one row per element (empty arrays become a single null row; nulls and scalars pass through unchanged).
+
+`stack()`/`unstack()` are intentionally not provided — `melt()` and `pivot()` fill those roles — and `rename()`/`reorderColumns()` have existed since v0.1.0.
+
 ## Window functions and advanced analytics (v0.13.0)
 
 `dataset.window(seed?)` and `analysisResult.window(seed?)` start a window-function builder: calculations run across related rows without collapsing them into grouped records. Every function appends one column and the output keeps all input rows in the input's order — window operations never remove rows, and partitioning/ordering affect only the calculation sequence, never the output order.
@@ -477,6 +497,7 @@ In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display
 - `0.11.0` Analysis engine: lightweight AnalysisResult, fluent analyze() builder with SQL-inspired query operations, full aggregation catalog with conditional aggregations and aliases, composable immutable results, lightweight lineage, default + named exports, 1000-row table default with row-count footer, and TypeScript declarations for the public API.
 - `0.12.0` Dataset joins and relationships: inner/left/right/full/cross joins on Dataset, AnalysisResult, and array inputs; multiple and differently named keys; configurable collision suffixes with overwrite prevention; one-to-one/one-to-many/many-to-one/many-to-many validation; consistent null, unmatched, duplicate-key, and empty-input behavior; hash-based execution with documented ordering; composable AnalysisResult output.
 - `0.13.0` Window functions and advanced analytics: window builder with ranking (rowNumber, rank, denseRank, percentRank, cumeDist, ntile), offsets (lag, lead, firstValue, lastValue, nthValue with offsets/defaults), cumulative (sum, mean, min, max, count), rolling (mean, sum, min, max, std with window/minPeriods), time-based (pctChange/growthRate with periods), multi-column partitioning/ordering with documented null and tie behavior, row preservation, declarative seed/toJSON/fromJSON replay, and TypeScript declarations.
+- `0.14.0` Data reshaping: pivot (long to wide with the full aggregation catalog, fillValue, first-seen ordering), melt (wide to long with idVars/valueVars/varName/valueName), crosstab (counts, values aggregations, row/column/total percentages, totals row/column), transpose, and explode — all composable AnalysisResult output with lineage, source immutability, empty-dataset handling, and TypeScript declarations.
 - `1.0.0` Stable integrated API.
 
 The roadmap is directional; features are not considered implemented until present in the corresponding release.

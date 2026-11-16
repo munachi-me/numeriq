@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.15.0 — Data lineage and schema management
+
+- Added structured, immutable lineage on every `AnalysisResult`: source dataset name/id and creation time, the producing operation, operation parameters where JSON-safe, and parent-child propagation through derived results — inspectable via `result.lineage()` / `result.history()` and never containing dataset row copies.
+- Added `SchemaDefinition`/`createSchema` with column names, types (`string`, `number`, `integer`, `boolean`, `date`, `datetime`, `time`), nullability, required flags, and constraints (`min`, `max`, `minLength`, `maxLength`, `pattern`, `enum`, `unique`, `custom`); schemas serialize via `toJSON()` and rebuild via `createSchema(document)`, accepting shorthand type strings.
+- Added validation methods on `Dataset` and `AnalysisResult`: `validateSchema(definition)` returning typed errors (`MISSING_COLUMN`, `TYPE_MISMATCH`, `NULL_NOT_ALLOWED`, `NOT_UNIQUE`, `CONSTRAINT_VIOLATION`) and warnings; `isValid()` boolean shortcut; `validationReport()` per-column summary (inferred vs expected types, null counts/percentages, error counts) with or without a schema; `assertSchema()` throwing a descriptive `ValidationError` on failure.
+- Added optional dataset relationship management via `normalizeRelationshipDefinition` semantics: parent/child dataset names, `parentKey`/`childKey`, and `one-to-one`/`one-to-many`/`many-to-one`/`many-to-many` cardinalities, with non-throwing validation reports (duplicate primary/foreign keys per cardinality, orphaned foreign keys, missing columns). Defining relationships is never required for joins.
+- Added a lightweight in-memory `DatasetCollection`/`createCollection` grouping named datasets with optional relationship definitions — no persistence, no query engine; datasets keep their full behavior and duplicate names/unknown references are rejected.
+- Added `numeriq/schema` and `numeriq/collection` subpath exports and root exports (`SchemaDefinition`, `createSchema`, `DatasetCollection`, `createCollection`).
+- Updated README, CHANGELOG, TEST-RESULT.md, examples, and TypeScript declarations; preserved v0.1–v0.14 behavior with 174 passing tests (162 pre-existing plus 12 new lineage/schema tests).
+
+## 0.14.0 — Data reshaping
+
 ## 0.14.0 — Data reshaping
 
 - Added long-to-wide `pivot({ index, columns, values, agg })` supporting the full aggregation catalog (with `ddof`/`q`/`p`/`method` options), first-seen row/column ordering, `fillValue` for missing combinations, and null pivot keys becoming their own column.

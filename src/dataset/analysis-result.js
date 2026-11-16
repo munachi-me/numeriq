@@ -8,6 +8,7 @@ import { AnalysisBuilder } from './analysis.js';
 import { WindowBuilder } from './windows.js';
 import { executeJoin, toJoinContext } from './joins.js';
 import { pivot, melt, crosstab, transpose, explode } from './reshape.js';
+import { SchemaDefinition, buildValidationReport } from './schema.js';
 
 const INSPECT = Symbol.for('nodejs.util.inspect.custom');
 const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
@@ -140,6 +141,17 @@ export class AnalysisResult {
   #reshape(compute, operation) {
     const result = compute();
     return new AnalysisResult(result.rows, result.columns, { lineage: { ...(this.#lineageValue() ?? { source: 'AnalysisResult' }), operation } });
+  }
+  validateSchema(definition) { return new SchemaDefinition(definition).validate(this.rows, this.#columns); }
+  isValid(definition) { return this.validateSchema(definition).valid; }
+  validationReport(definition = null) { return buildValidationReport(this.rows, this.#columns, definition); }
+  assertSchema(definition) {
+    const report = this.validateSchema(definition);
+    if (!report.valid) {
+      const first = report.errors[0];
+      throw new ValidationError(`Schema validation failed (${report.errors.length} error${report.errors.length === 1 ? '' : 's'}): ${first.message}`);
+    }
+    return report;
   }
   #joinWith(right, options) {
     const result = executeJoin(

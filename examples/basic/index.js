@@ -1,5 +1,6 @@
 import {
   createChartSpec,
+  createCollection,
   createDashboardSpec,
   createDataset,
   createInsightSet,
@@ -360,3 +361,37 @@ console.log('V0.14 MELT (back to long form):', longAgain.length, 'rows');
 console.log('V0.14 CROSSTAB (Category × tier counts):');
 console.log(reshaper.crosstab('Category', 'tier').table());
 console.log('V0.14 CROSSTAB ROW PERCENTAGES:', reshaper.crosstab('Category', 'tier', { percentBy: 'row', totals: false }).rows);
+
+
+// V0.15: Data lineage & schema management — provenance, validation, relationships
+const schemaReport = currentSales.validateSchema({
+  columns: {
+    Transaction_ID: { type: 'integer', required: true, unique: true },
+    Date: { type: 'date', required: true },
+    Total_Amount: { type: 'number', nullable: false, min: 0 }
+  }
+});
+console.log('V0.15 SCHEMA VALID:', schemaReport.valid, '| errors:', schemaReport.errors.length);
+
+const monthlyRevenue = currentSales
+  .castColumn('Date', 'date')
+  .extractDatePart('Date', 'month', { as: 'Month' })
+  .analyze()
+  .groupBy('Month')
+  .sum('Total_Amount', { as: 'revenue' })
+  .orderBy('Month')
+  .execute();
+console.log('V0.15 DERIVED LINEAGE:', JSON.stringify(monthlyRevenue.lineage()));
+
+const shop = createCollection({
+  name: 'Shop',
+  datasets: {
+    Customers: createDataset([{ customerId: 1, name: 'Ada' }, { customerId: 2, name: 'Bo' }]),
+    Orders: currentSales.addColumn('customerId', row => (row.Transaction_ID % 2) + 1)
+  },
+  relationships: [
+    { name: 'customer-orders', parent: 'Customers', child: 'Orders', parentKey: 'customerId', childKey: 'customerId', cardinality: 'one-to-many' }
+  ]
+});
+console.log('V0.15 RELATIONSHIP CHECK:', shop.validateRelationships().map(r => ({ name: r.relationship, valid: r.valid, violations: r.violations.length })));
+console.log('V0.15 MONTHLY REVENUE:', monthlyRevenue.rows);

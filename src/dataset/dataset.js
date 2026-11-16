@@ -13,6 +13,7 @@ import { createQuery, compileCondition } from './query.js';
 import { executeJoin, toJoinContext } from './joins.js';
 import { WindowBuilder } from './windows.js';
 import { pivot, melt, crosstab, transpose, explode } from './reshape.js';
+import { SchemaDefinition, buildValidationReport } from './schema.js';
 import { evaluateExpression } from './expressions.js';
 
 const INSPECT = Symbol.for('nodejs.util.inspect.custom');
@@ -175,6 +176,17 @@ export class Dataset {
   #reshape(compute, operation) {
     const result = compute();
     return new AnalysisResult(result.rows, result.columns, { lineage: { ...this.#lineageValue(), operation } });
+  }
+  validateSchema(definition) { return new SchemaDefinition(definition).validate(this.rows, this.#columns); }
+  isValid(definition) { return this.validateSchema(definition).valid; }
+  validationReport(definition = null) { return buildValidationReport(this.rows, this.#columns, definition); }
+  assertSchema(definition) {
+    const report = this.validateSchema(definition);
+    if (!report.valid) {
+      const first = report.errors[0];
+      throw new ValidationError(`Schema validation failed (${report.errors.length} error${report.errors.length === 1 ? '' : 's'}): ${first.message}`);
+    }
+    return report;
   }
   query(document) {
     const result = createQuery(document).run(this);

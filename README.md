@@ -2,7 +2,7 @@
 
 **JavaScript Data Science Engine** — a lightweight, framework-independent foundation for working with tabular data in JavaScript.
 
-> Version 0.14.0 adds data reshaping: `pivot()` from long to wide form with configurable aggregation, `melt()` from wide to long form, `crosstab()` frequency/percentage analysis, plus `transpose()` and `explode()` — all returning composable `AnalysisResult` output. Output is renderer-neutral; Numeriq remains an early development build, not yet a production-stability promise.
+> Version 0.15.0 adds data lineage and schema management: structured provenance on every derived result, schema definition and validation (`validateSchema`, `isValid`, `validationReport`, `assertSchema`), dataset relationship checks, and a lightweight `DatasetCollection`. Output is renderer-neutral; Numeriq remains an early development build, not yet a production-stability promise.
 
 ## Requirements
 
@@ -289,6 +289,28 @@ console.log(chartData); // Dataset columns: Category, Total_Amount, Product
 
 Groups remain in first-seen order unless `sort: { by: 'x' | 'y' | 'series', direction: 'asc' | 'desc' }` is provided; sorting is stable and nulls remain last. Common `options` are `legend` and `grid`. Bar charts also accept `stacked` and `orientation: 'vertical' | 'horizontal'`; line charts accept `connectNulls`; scatter charts accept a positive `pointSize`. Invalid fields and chart-specific options are rejected. Serialize with `JSON.stringify(spec)` and restore with `ChartSpec.fromJSON(document)` or `createChartSpec(document)`. The API is also exported from `numeriq/charts`, and prepared chart data can come from any Dataset, including v0.7 scorecards and v0.8 findings.
 
+## Data lineage and schema management (v0.15.0)
+
+**Lineage.** Every `AnalysisResult` carries lightweight, immutable provenance, inspectable with `result.lineage()` or `result.history()`: the source dataset name/id and creation time, the operation chain that produced the result (`analyze`, `window`, `join`, pivot, and so on), and operation parameters where JSON-safe. Lineage propagates through derived results without copying datasets — row data never appears in a lineage object, and mutating the returned object does not affect the result.
+
+**Schema management.** Define expected columns, types (`string`, `number`, `integer`, `boolean`, `date`, `datetime`, `time`), nullability, required flags, and constraints (`min`, `max`, `minLength`, `maxLength`, `pattern`, `enum`, `unique`, `custom`):
+
+```js
+dataset.validateSchema({ columns: { customerId: { type: 'string', required: true }, amount: { type: 'number', nullable: false }, date: { type: 'date' } } });
+```
+
+**Validation methods.** Available on both `Dataset` and `AnalysisResult`:
+- `validateSchema(definition)` — full report: `valid`, typed `errors` (`MISSING_COLUMN`, `TYPE_MISMATCH`, `NULL_NOT_ALLOWED`, `NOT_UNIQUE`, `CONSTRAINT_VIOLATION`) and `warnings` per row/column.
+- `isValid(definition)` — boolean shortcut. A required column missing from the data is an error; a non-required missing column only warns.
+- `validationReport(definition?)` — per-column summary (inferred vs expected types, null counts/percentages, error counts) merged with schema errors; without a definition it reports inferred profiles only.
+- `assertSchema(definition)` — throws a `ValidationError` summarizing the first failure when invalid.
+
+Schemas serialize via `toJSON()` and rebuild with `createSchema(document)`. Shorthand type strings (`a: 'number'`) are accepted.
+
+**Dataset relationships.** Optional named definitions between collections' datasets: parent/child names, `parentKey`/`childKey`, and `cardinality` (`one-to-one`, `one-to-many`, `many-to-one`, `many-to-many`). `validateRelationships()` returns a report per relationship (duplicate primary/foreign keys per cardinality, orphaned foreign keys, missing columns) without throwing. Defining relationships is never required for joins.
+
+**DatasetCollection** — `createCollection({ name, datasets, relationships })` groups related datasets by name (`add`, `get`, `has`, `names`, `size`) and manages relationship definitions. It is an in-memory naming layer only: no persistence, no query engine, and datasets keep their full behavior. Duplicate names, unknown dataset references in relationships, and invalid definitions are rejected.
+
 ## Data reshaping (v0.14.0)
 
 Reshaping operations restructure tabular data for analysis and visualization. All are available on `Dataset` and `AnalysisResult`, return composable `AnalysisResult` objects with reshaping-aware lineage, never mutate their sources, and handle empty datasets.
@@ -498,6 +520,7 @@ In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display
 - `0.12.0` Dataset joins and relationships: inner/left/right/full/cross joins on Dataset, AnalysisResult, and array inputs; multiple and differently named keys; configurable collision suffixes with overwrite prevention; one-to-one/one-to-many/many-to-one/many-to-many validation; consistent null, unmatched, duplicate-key, and empty-input behavior; hash-based execution with documented ordering; composable AnalysisResult output.
 - `0.13.0` Window functions and advanced analytics: window builder with ranking (rowNumber, rank, denseRank, percentRank, cumeDist, ntile), offsets (lag, lead, firstValue, lastValue, nthValue with offsets/defaults), cumulative (sum, mean, min, max, count), rolling (mean, sum, min, max, std with window/minPeriods), time-based (pctChange/growthRate with periods), multi-column partitioning/ordering with documented null and tie behavior, row preservation, declarative seed/toJSON/fromJSON replay, and TypeScript declarations.
 - `0.14.0` Data reshaping: pivot (long to wide with the full aggregation catalog, fillValue, first-seen ordering), melt (wide to long with idVars/valueVars/varName/valueName), crosstab (counts, values aggregations, row/column/total percentages, totals row/column), transpose, and explode — all composable AnalysisResult output with lineage, source immutability, empty-dataset handling, and TypeScript declarations.
+- `0.15.0` Data lineage and schema management: structured immutable lineage on every AnalysisResult (source, operations, parameters, parent-child propagation, no dataset copies), schema definitions with types/nullability/required/constraints (min, max, minLength, maxLength, pattern, enum, unique, custom), `validateSchema`/`isValid`/`validationReport`/`assertSchema` on Dataset and AnalysisResult, optional relationship definitions with cardinality and orphan/duplicate-key reports, and a lightweight in-memory DatasetCollection.
 - `1.0.0` Stable integrated API.
 
 The roadmap is directional; features are not considered implemented until present in the corresponding release.

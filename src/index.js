@@ -11,6 +11,8 @@ import { TransformationPipeline, createPipeline } from './dataset/pipeline.js';
 import { Query, createQuery } from './dataset/query.js';
 import { WindowBuilder } from './dataset/windows.js';
 import { pivot, melt, crosstab, transpose, explode } from './dataset/reshape.js';
+import { SchemaDefinition, createSchema } from './dataset/schema.js';
+import { DatasetCollection, createCollection } from './dataset/collection.js';
 import { Series } from './dataset/series.js';
 import {
   sum, mean, average, median, min, max, count, countRows, nunique, variance, std, stddev,
@@ -27,7 +29,7 @@ export {
   MetricSet, createMetricSet, InsightSet, createInsightSet, ChartSpec, createChartSpec,
   DashboardSpec, createDashboardSpec, ReportSpec, createReportSpec,
   TransformationPipeline, createPipeline, Query, createQuery, Series, WindowBuilder,
-  pivot, melt, crosstab, transpose, explode,
+  pivot, melt, crosstab, transpose, explode, SchemaDefinition, createSchema, DatasetCollection, createCollection,
   sum, mean, average, median, min, max, count, countRows, nunique, variance, std, stddev,
   range, quantile, percentile, quartiles, iqr, mad, skewness, kurtosis,
   parseCSV, parseJSON, loadCSV, loadJSON, loadData, loadMany, useSampleDataset,
@@ -40,7 +42,7 @@ const Numeriq = {
   MetricSet, createMetricSet, InsightSet, createInsightSet, ChartSpec, createChartSpec,
   DashboardSpec, createDashboardSpec, ReportSpec, createReportSpec,
   TransformationPipeline, createPipeline, Query, createQuery, Series, WindowBuilder,
-  pivot, melt, crosstab, transpose, explode,
+  pivot, melt, crosstab, transpose, explode, SchemaDefinition, createSchema, DatasetCollection, createCollection,
   sum, mean, average, median, min, max, count, countRows, nunique, variance, std, stddev,
   range, quantile, percentile, quartiles, iqr, mad, skewness, kurtosis,
   parseCSV, parseJSON, loadCSV, loadJSON, loadData, loadMany, useSampleDataset,

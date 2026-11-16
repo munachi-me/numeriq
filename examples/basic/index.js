@@ -342,3 +342,21 @@ const windowDoc = salesWithDates.window().partitionBy('Category').orderBy('Date'
 console.log('V0.13 DECLARATIVE WINDOW DOC:', JSON.stringify(windowDoc));
 const replayed = salesWithDates.window(windowDoc).execute();
 console.log('V0.13 REPLAYED RANKS:', replayed.rows.slice(0, 3).map(row => ({ category: row.Category, revenueRank: row.revenueRank })));
+
+// V0.14: Data reshaping — pivot, melt, crosstab, transpose, explode
+const reshaper = currentSales.addColumn('customerId', row => (row.Transaction_ID % 3) + 1)
+  .innerJoin(createDataset([
+    { customerId: 1, tier: 'gold' },
+    { customerId: 2, tier: 'silver' },
+    { customerId: 3, tier: 'bronze' }
+  ]), { on: 'customerId' });
+const wideRevenue = reshaper.pivot({ index: 'Category', columns: 'tier', values: 'Total_Amount', agg: 'sum' });
+console.log('V0.14 PIVOT (revenue by category × tier):');
+console.log(wideRevenue.table());
+
+const longAgain = wideRevenue.melt({ idVars: ['Category'], varName: 'tier', valueName: 'revenue' });
+console.log('V0.14 MELT (back to long form):', longAgain.length, 'rows');
+
+console.log('V0.14 CROSSTAB (Category × tier counts):');
+console.log(reshaper.crosstab('Category', 'tier').table());
+console.log('V0.14 CROSSTAB ROW PERCENTAGES:', reshaper.crosstab('Category', 'tier', { percentBy: 'row', totals: false }).rows);

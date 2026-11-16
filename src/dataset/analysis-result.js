@@ -7,6 +7,7 @@ import { GroupedDataset } from './grouping.js';
 import { AnalysisBuilder } from './analysis.js';
 import { WindowBuilder } from './windows.js';
 import { executeJoin, toJoinContext } from './joins.js';
+import { pivot, melt, crosstab, transpose, explode } from './reshape.js';
 
 const INSPECT = Symbol.for('nodejs.util.inspect.custom');
 const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
@@ -131,6 +132,15 @@ export class AnalysisResult {
   fullJoin(right, options = {}) { return this.#joinWith(right, { ...options, how: 'full' }); }
   crossJoin(right, options = {}) { return this.#joinWith(right, { ...options, how: 'cross' }); }
   window(seed) { return new WindowBuilder(this.rows, this.#columns, this.name ?? 'AnalysisResult', this.#lineageValue(), seed); }
+  pivot(options) { return this.#reshape(result => pivot({ rows: this.rows, columns: this.#columns }, options), 'pivot'); }
+  melt(options) { return this.#reshape(result => melt({ rows: this.rows, columns: this.#columns }, options), 'melt'); }
+  crosstab(rowColumn, columnColumn, options) { return this.#reshape(result => crosstab({ rows: this.rows, columns: this.#columns }, rowColumn, columnColumn, options), 'crosstab'); }
+  transpose(options) { return this.#reshape(result => transpose({ rows: this.rows, columns: this.#columns }, options), 'transpose'); }
+  explode(column) { return this.#reshape(result => explode({ rows: this.rows, columns: this.#columns }, column), 'explode'); }
+  #reshape(compute, operation) {
+    const result = compute();
+    return new AnalysisResult(result.rows, result.columns, { lineage: { ...(this.#lineageValue() ?? { source: 'AnalysisResult' }), operation } });
+  }
   #joinWith(right, options) {
     const result = executeJoin(
       toJoinContext({ rows: this.rows, columns: this.#columns, name: 'AnalysisResult' }, 'Left join input'),

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.14.0 — Data reshaping
+
+- Added long-to-wide `pivot({ index, columns, values, agg })` supporting the full aggregation catalog (with `ddof`/`q`/`p`/`method` options), first-seen row/column ordering, `fillValue` for missing combinations, and null pivot keys becoming their own column.
+- Added wide-to-long `melt({ idVars, valueVars, varName, valueName })` with `valueVars` defaulting to the complement of `idVars`, per-variable long rows in source order, null values preserved, and overlap/uniqueness validation.
+- Added `crosstab(rowColumn, columnColumn, { values, agg, percentBy, totals, totalName })` for frequency and cross-tabulation analysis: counts or value aggregations, `percentBy: 'row' | 'column' | 'total'` with defined behaviors (percent-of-total rows keep raw counts in their totals cell; totals row/column report real totals or 1), and an optional totals row/column named via `totalName` (default 'All').
+- Added `transpose({ labelColumn })` exchanging rows and columns, and `explode(column)` fanning array values into one row per element (empty arrays become a null row; nulls and scalars pass through).
+- All reshaping operations are available on `Dataset` and `AnalysisResult`, return composable `AnalysisResult` objects with reshaping-aware lineage (`pivot`, `melt`, `crosstab`, `transpose`, `explode`), never mutate sources, preserve column ordering, and handle empty datasets.
+- Added `numeriq/reshape` subpath export and root exports (`pivot`, `melt`, `crosstab`, `transpose`, `explode`); `stack()`/`unstack()` were not added because `melt`/`pivot` already fill those roles and `flatten()`/`rename()`/`reorderColumns()` already exist (flatten via melt, rename/reorder since v0.1.0).
+- Updated README, CHANGELOG, TEST-RESULT.md, examples, and TypeScript declarations; preserved v0.1–v0.13 behavior with 162 passing tests (151 pre-existing plus 11 new data-reshaping tests).
+
+## 0.13.0 — Window functions and advanced analytics
+
 ## 0.13.0 — Window functions and advanced analytics
 
 - Added the `WindowBuilder` engine, available as `dataset.window(seed?)` and `analysisResult.window(seed?)`, performing calculations across related rows without collapsing them: every function appends one column, the output keeps all input rows in the input's order, and sources are never mutated.

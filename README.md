@@ -2,7 +2,7 @@
 
 **JavaScript Data Science Engine** — a lightweight, framework-independent foundation for working with tabular data in JavaScript.
 
-> Version 0.12.0 adds dataset joins and relationships: inner, left, right, full, and cross joins with multiple/differently named keys, configurable collision suffixes, relationship validation, hash-based execution, and composable `AnalysisResult` output. Output is renderer-neutral; Numeriq remains an early development build, not yet a production-stability promise.
+> Version 0.13.0 adds window functions and advanced analytics: a `window()` builder with ranking, offset, cumulative, rolling, and time-based calculations across partitions — every function appends a column without removing rows. Output is renderer-neutral; Numeriq remains an early development build, not yet a production-stability promise.
 
 ## Requirements
 
@@ -289,6 +289,32 @@ console.log(chartData); // Dataset columns: Category, Total_Amount, Product
 
 Groups remain in first-seen order unless `sort: { by: 'x' | 'y' | 'series', direction: 'asc' | 'desc' }` is provided; sorting is stable and nulls remain last. Common `options` are `legend` and `grid`. Bar charts also accept `stacked` and `orientation: 'vertical' | 'horizontal'`; line charts accept `connectNulls`; scatter charts accept a positive `pointSize`. Invalid fields and chart-specific options are rejected. Serialize with `JSON.stringify(spec)` and restore with `ChartSpec.fromJSON(document)` or `createChartSpec(document)`. The API is also exported from `numeriq/charts`, and prepared chart data can come from any Dataset, including v0.7 scorecards and v0.8 findings.
 
+## Window functions and advanced analytics (v0.13.0)
+
+`dataset.window(seed?)` and `analysisResult.window(seed?)` start a window-function builder: calculations run across related rows without collapsing them into grouped records. Every function appends one column and the output keeps all input rows in the input's order — window operations never remove rows, and partitioning/ordering affect only the calculation sequence, never the output order.
+
+```js
+const result = sales.window()
+  .partitionBy('region')
+  .orderBy('date')
+  .rowNumber({ as: 'sequence' })
+  .sum === null ? null : null;
+```
+
+**Ranking** — `rowNumber()`, `rank()`, `denseRank()`, `percentRank()`, `cumeDist()`, and `ntile(buckets)`. Ties share rank values (equal order keys); row numbers stay unique via stable ordering.
+
+**Offsets** — `lag()`, `lead()` with configurable `offset` and `default` values, plus `firstValue()`, `lastValue()`, and `nthValue({ n })`.
+
+**Cumulative** — `cumulativeSum()`, `cumulativeMean()`, `cumulativeMin()`, `cumulativeMax()`, `cumulativeCount()`, each skipping nulls consistently.
+
+**Rolling** — `rollingMean()`, `rollingSum()`, `rollingMin()`, `rollingMax()`, `rollingStd()` with configurable `window` size and `minPeriods` (positions before `minPeriods` produce null).
+
+**Time-based** — `pctChange()` and `growthRate()` alias with configurable `periods`. A change to zero is a defined -100% change; a zero previous value yields null.
+
+**Partitioning and ordering** — multiple partition and order columns are supported with `asc`/`desc` directions. ISO date strings order chronologically; nulls sort last within partitions. Calculations always run within the correct partition.
+
+**Declarative configuration** — `window(seed)` accepts `{ version, partitionBy, orderBy, functions }`, `toJSON()` serializes the definition, and `WindowBuilder.fromJSON()` replays it. Documents are versioned and available via `numeriq/windows`.
+
 ## Dataset joins and relationships (v0.12.0)
 
 Joins combine two tabular inputs — `Dataset`, `AnalysisResult`, or plain arrays of row objects — and always return a composable `AnalysisResult`, so join output chains directly into `analyze()`, `filter()`, `groupBy()`, and the rest of the v0.11.0 analysis API. Available on both `Dataset` and `AnalysisResult`: `join(right, options)`, `innerJoin()`, `leftJoin()`, `rightJoin()`, `fullJoin()`, and `crossJoin()`.
@@ -450,6 +476,7 @@ In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display
 - `0.10.0` Dashboard and reporting foundations: versioned DashboardSpec layouts and ReportSpec sections composing MetricSet, InsightSet, and ChartSpec definitions into renderer-neutral, JSON-serializable prepared data.
 - `0.11.0` Analysis engine: lightweight AnalysisResult, fluent analyze() builder with SQL-inspired query operations, full aggregation catalog with conditional aggregations and aliases, composable immutable results, lightweight lineage, default + named exports, 1000-row table default with row-count footer, and TypeScript declarations for the public API.
 - `0.12.0` Dataset joins and relationships: inner/left/right/full/cross joins on Dataset, AnalysisResult, and array inputs; multiple and differently named keys; configurable collision suffixes with overwrite prevention; one-to-one/one-to-many/many-to-one/many-to-many validation; consistent null, unmatched, duplicate-key, and empty-input behavior; hash-based execution with documented ordering; composable AnalysisResult output.
+- `0.13.0` Window functions and advanced analytics: window builder with ranking (rowNumber, rank, denseRank, percentRank, cumeDist, ntile), offsets (lag, lead, firstValue, lastValue, nthValue with offsets/defaults), cumulative (sum, mean, min, max, count), rolling (mean, sum, min, max, std with window/minPeriods), time-based (pctChange/growthRate with periods), multi-column partitioning/ordering with documented null and tie behavior, row preservation, declarative seed/toJSON/fromJSON replay, and TypeScript declarations.
 - `1.0.0` Stable integrated API.
 
 The roadmap is directional; features are not considered implemented until present in the corresponding release.

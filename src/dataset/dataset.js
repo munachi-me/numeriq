@@ -11,6 +11,7 @@ import { AnalysisBuilder } from './analysis.js';
 import { AnalysisResult } from './analysis-result.js';
 import { createQuery, compileCondition } from './query.js';
 import { executeJoin, toJoinContext } from './joins.js';
+import { WindowBuilder } from './windows.js';
 import { evaluateExpression } from './expressions.js';
 
 const INSPECT = Symbol.for('nodejs.util.inspect.custom');
@@ -164,6 +165,7 @@ export class Dataset {
     const lineage = { ...this.#lineageValue(), operation: `join:${options.how ?? 'inner'}` };
     return new AnalysisResult(result.rows, result.columns, { lineage });
   }
+  window(seed) { return new WindowBuilder(this.rows, this.#columns, this.name, this.#lineageValue(), seed); }
   query(document) {
     const result = createQuery(document).run(this);
     return this.#analysisResult(result.rows, result.columns);

@@ -5,6 +5,7 @@ import { normalizeAggregations, computeAggregation } from './aggregations.js';
 import { compileCondition } from './query.js';
 import { GroupedDataset } from './grouping.js';
 import { AnalysisBuilder } from './analysis.js';
+import { WindowBuilder } from './windows.js';
 import { executeJoin, toJoinContext } from './joins.js';
 
 const INSPECT = Symbol.for('nodejs.util.inspect.custom');
@@ -129,6 +130,7 @@ export class AnalysisResult {
   rightJoin(right, options = {}) { return this.#joinWith(right, { ...options, how: 'right' }); }
   fullJoin(right, options = {}) { return this.#joinWith(right, { ...options, how: 'full' }); }
   crossJoin(right, options = {}) { return this.#joinWith(right, { ...options, how: 'cross' }); }
+  window(seed) { return new WindowBuilder(this.rows, this.#columns, this.name ?? 'AnalysisResult', this.#lineageValue(), seed); }
   #joinWith(right, options) {
     const result = executeJoin(
       toJoinContext({ rows: this.rows, columns: this.#columns, name: 'AnalysisResult' }, 'Left join input'),

@@ -9,6 +9,7 @@ import { DashboardSpec, createDashboardSpec } from './dataset/dashboard.js';
 import { ReportSpec, createReportSpec } from './dataset/report.js';
 import { TransformationPipeline, createPipeline } from './dataset/pipeline.js';
 import { Query, createQuery } from './dataset/query.js';
+import { WindowBuilder } from './dataset/windows.js';
 import { Series } from './dataset/series.js';
 import {
   sum, mean, average, median, min, max, count, countRows, nunique, variance, std, stddev,
@@ -24,7 +25,7 @@ export {
   Dataset, createDataset, GroupedDataset, AnalysisResult, AnalysisBuilder,
   MetricSet, createMetricSet, InsightSet, createInsightSet, ChartSpec, createChartSpec,
   DashboardSpec, createDashboardSpec, ReportSpec, createReportSpec,
-  TransformationPipeline, createPipeline, Query, createQuery, Series,
+  TransformationPipeline, createPipeline, Query, createQuery, Series, WindowBuilder,
   sum, mean, average, median, min, max, count, countRows, nunique, variance, std, stddev,
   range, quantile, percentile, quartiles, iqr, mad, skewness, kurtosis,
   parseCSV, parseJSON, loadCSV, loadJSON, loadData, loadMany, useSampleDataset,
@@ -36,7 +37,7 @@ const Numeriq = {
   Dataset, createDataset, GroupedDataset, AnalysisResult, AnalysisBuilder,
   MetricSet, createMetricSet, InsightSet, createInsightSet, ChartSpec, createChartSpec,
   DashboardSpec, createDashboardSpec, ReportSpec, createReportSpec,
-  TransformationPipeline, createPipeline, Query, createQuery, Series,
+  TransformationPipeline, createPipeline, Query, createQuery, Series, WindowBuilder,
   sum, mean, average, median, min, max, count, countRows, nunique, variance, std, stddev,
   range, quantile, percentile, quartiles, iqr, mad, skewness, kurtosis,
   parseCSV, parseJSON, loadCSV, loadJSON, loadData, loadMany, useSampleDataset,

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.13.0 — Window functions and advanced analytics
+
+- Added the `WindowBuilder` engine, available as `dataset.window(seed?)` and `analysisResult.window(seed?)`, performing calculations across related rows without collapsing them: every function appends one column, the output keeps all input rows in the input's order, and sources are never mutated.
+- Added ranking functions `rowNumber()`, `rank()`, `denseRank()`, `percentRank()`, `cumeDist()`, and `ntile(buckets)` with stable tie handling (equal order keys share rank values; row numbers stay unique).
+- Added offset functions `lag()`, `lead()` with configurable `offset` and `default` values, plus `firstValue()`, `lastValue()`, and `nthValue({ n })`.
+- Added cumulative functions `cumulativeSum()`, `cumulativeMean()`, `cumulativeMin()`, `cumulativeMax()`, and `cumulativeCount()` with consistent null skipping.
+- Added rolling calculations `rollingMean()`, `rollingSum()`, `rollingMin()`, `rollingMax()`, and `rollingStd()` with configurable `window` size and `minPeriods` (values before minPeriods produce null).
+- Added time-based analytics `pctChange()` and `growthRate()` alias with configurable `periods`; a change to zero is a defined -100% change, while a zero previous value yields null.
+- Added multi-column `partitionBy()` and multi-column `orderBy()` with `asc`/`desc` directions; ISO date strings order chronologically, nulls sort last within partitions, and all calculations run within the correct partition without changing output order.
+- Added declarative configuration: `window(seed)` accepts `{ version, partitionBy, orderBy, functions }`, `toJSON()` serializes the window definition, and `WindowBuilder.fromJSON()` replays it; documents are versioned.
+- Added window lineage, `numeriq/windows` subpath export, root `WindowBuilder` export, and TypeScript declarations for the window API.
+- Updated README, CHANGELOG, TEST-RESULT.md, and examples; preserved v0.1–v0.12 behavior with 151 passing tests (138 pre-existing plus 13 new window-function tests).
+
+## 0.12.0 — Dataset joins and relationships
+
 ## 0.12.0 — Dataset joins and relationships
 
 - Added inner, left, right, full, and cross joins via `join(right, options)` plus dedicated `innerJoin()`, `leftJoin()`, `rightJoin()`, `fullJoin()`, and `crossJoin()` methods, available on both `Dataset` and `AnalysisResult` and accepting Dataset, AnalysisResult, or plain row-array inputs.

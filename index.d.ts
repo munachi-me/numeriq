@@ -96,6 +96,7 @@ export class AnalysisResult {
   fullJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
   crossJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
   window(seed?: WindowSeed): WindowBuilder;
+  chart(definition: ChartDefinition): ChartSpecLike;
   pivot(options: PivotOptions): AnalysisResult;
   melt(options?: MeltOptions): AnalysisResult;
   crosstab(rowColumn: string, columnColumn: string, options?: CrosstabOptions): AnalysisResult;
@@ -161,6 +162,58 @@ export interface JoinOptions {
 }
 
 export type JoinSide = Dataset | AnalysisResult | Row[];
+
+export type ChartType =
+  | 'bar' | 'area' | 'pie' | 'donut' | 'line' | 'scatter' | 'bubble'
+  | 'histogram' | 'boxplot' | 'heatmap' | 'funnel';
+
+export interface ChartOptions {
+  legend?: boolean;
+  grid?: boolean;
+  stacked?: boolean;
+  orientation?: 'vertical' | 'horizontal';
+  connectNulls?: boolean;
+  pointSize?: number;
+  bins?: number;
+  dataLabels?: boolean;
+  tooltips?: boolean;
+  numberFormat?: string;
+  dateFormat?: string;
+}
+
+export interface ChartDefinition {
+  type: ChartType;
+  x: string;
+  y?: string;
+  series?: string;
+  size?: string;
+  title?: string;
+  subtitle?: string;
+  xLabel?: string;
+  yLabel?: string;
+  aggregate?: { op: string; q?: number; method?: string; ddof?: number } | null;
+  sort?: { by: 'x' | 'y' | 'series'; direction?: 'asc' | 'desc' } | null;
+  colors?: string[];
+  dataLabels?: boolean;
+  tooltips?: boolean;
+  numberFormat?: string;
+  dateFormat?: string;
+  options?: ChartOptions;
+}
+
+export interface ChartRecommendation {
+  recommendation: { type: ChartType; why: string };
+  alternatives: Array<{ type: ChartType; why: string }>;
+  basedOn: Record<string, unknown>;
+  disclaimer: string;
+}
+
+export interface ChartSpecLike {
+  chart: ChartDefinition;
+  version: number;
+  toJSON(): { version: number; chart: ChartDefinition };
+  prepare(dataset: Dataset): Dataset;
+}
 
 export interface WindowSeed {
   version?: number;
@@ -308,6 +361,7 @@ export class Dataset {
   fullJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
   crossJoin(right: JoinSide, options?: JoinOptions): AnalysisResult;
   window(seed?: WindowSeed): WindowBuilder;
+  chart(definition: ChartDefinition): ChartSpecLike;
   pivot(options: PivotOptions): AnalysisResult;
   melt(options?: MeltOptions): AnalysisResult;
   crosstab(rowColumn: string, columnColumn: string, options?: CrosstabOptions): AnalysisResult;

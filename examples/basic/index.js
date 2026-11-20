@@ -1,5 +1,6 @@
 import {
   createChartSpec,
+  recommendChart,
   createCollection,
   createDashboardSpec,
   createDataset,
@@ -395,3 +396,25 @@ const shop = createCollection({
 });
 console.log('V0.15 RELATIONSHIP CHECK:', shop.validateRelationships().map(r => ({ name: r.relationship, valid: r.valid, violations: r.violations.length })));
 console.log('V0.15 MONTHLY REVENUE:', monthlyRevenue.rows);
+
+// V0.16: Visualization engine — 11 chart types, configuration, recommendations
+const revenueByCategory = currentSales.chart({
+  type: 'bar', x: 'Category', y: 'Total_Amount', aggregate: { op: 'sum' },
+  title: 'Revenue by Category', subtitle: 'FY2026',
+  colors: ['#4e79a7', '#f28e2b', '#e15759'],
+  dataLabels: true, numberFormat: '$0,0'
+});
+console.log('V0.16 CHART SPEC (version', revenueByCategory.version + '):', JSON.stringify(revenueByCategory.chart));
+console.log('V0.16 PREPARED CHART DATA:');
+revenueByCategory.prepare(currentSales).display();
+
+const histogram = currentSales.chart({ type: 'histogram', x: 'Total_Amount', options: { bins: 4 } });
+console.log('V0.16 HISTOGRAM BINS:', histogram.prepare(currentSales).rows.map(r => `${r.bin}: ${r.count}`));
+
+console.log('V0.16 RECOMMENDATION:', recommendChart(
+  { name: 'Category', type: 'string', cardinality: 4 },
+  { name: 'Total_Amount', type: 'number' }
+).recommendation.type, '| disclaimer:', recommendChart(
+  { name: 'Category', type: 'string', cardinality: 4 },
+  { name: 'Total_Amount', type: 'number' }
+).disclaimer);

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.16.0 — Visualization engine
+
+- Extended the versioned, renderer-neutral `ChartSpec` system from 3 to 11 chart types: bar, horizontal bar (orientation), line, scatter (v0.9.0) plus area, pie, donut, bubble (x/y/size mappings), histogram (configurable `bins` with computed bin edges and counts), boxplot (five-number summaries per category), and heatmap (co-occurrence counts via `countRows`); funnel is accepted as a single-measure category chart.
+- Added chart configuration: `subtitle`, `colors` (non-empty string array), `dataLabels`, `tooltips`, `numberFormat`, and `dateFormat` fields plus per-type `options`, all validated and serialized.
+- Added `recommendChart(xInfo, yInfo?)`: heuristic chart-type suggestions from column types, cardinality, and data shape, with an explicit disclaimer that suggestions are not statistical conclusions.
+- Added a `chart(definition)` convenience method on `Dataset` and `AnalysisResult` returning a reusable `ChartSpec`; the same specification prepares different datasets for dashboard reuse.
+- Chart-spec documents are versioned: v1 documents from v0.9.0 restore unchanged (new fields default to null), v2 documents carry the extended fields; mixed combinations are rejected.
+- Dashboard integration preserved and extended: extended chart types work directly as dashboard chart panels; existing metric/insight/chart panel sources and reusable chart specifications are unchanged.
+- Updated README, CHANGELOG, TEST-RESULT.md, Node.js example, and a new browser example (`examples/browser/index.html`); TypeScript declarations extended. Preserved v0.1–v0.15 behavior with 186 passing tests (174 pre-existing plus 12 new visualization tests).
+
+## 0.15.0 — Data lineage and schema management
+
 ## 0.15.0 — Data lineage and schema management
 
 - Added structured, immutable lineage on every `AnalysisResult`: source dataset name/id and creation time, the producing operation, operation parameters where JSON-safe, and parent-child propagation through derived results — inspectable via `result.lineage()` / `result.history()` and never containing dataset row copies.

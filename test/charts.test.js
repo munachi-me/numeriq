@@ -123,7 +123,7 @@ test('ChartSpec preserves exact Dataset column names and requires an explicit do
 });
 
 test('ChartSpec validates types, mappings, aggregate options, sorting, data columns, and chart options', () => {
-  assert.throws(() => createChartSpec({ type: 'pie', x: 'x', y: 'y' }), /type must be bar, line, or scatter/);
+  assert.throws(() => createChartSpec({ type: 'waterfall', x: 'x', y: 'y' }), /Chart type must be one of/);
   assert.throws(() => createChartSpec({ type: 'bar', x: 'x' }), /Chart y mapping/);
   assert.throws(() => createChartSpec({ type: 'bar', x: 'same', y: 'same' }), /distinct columns/);
   assert.throws(() => createChartSpec({ type: 'scatter', x: 'x', y: 'y', aggregate: { op: 'sum' } }), /do not support aggregation/);

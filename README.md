@@ -2,7 +2,7 @@
 
 **JavaScript Data Science Engine** — a lightweight, framework-independent foundation for working with tabular data in JavaScript.
 
-> Version 0.15.0 adds data lineage and schema management: structured provenance on every derived result, schema definition and validation (`validateSchema`, `isValid`, `validationReport`, `assertSchema`), dataset relationship checks, and a lightweight `DatasetCollection`. Output is renderer-neutral; Numeriq remains an early development build, not yet a production-stability promise.
+> Version 0.16.0 expands the visualization engine to 11 renderer-neutral chart types (area, pie, donut, bubble, histogram, boxplot, heatmap, funnel join bar/line/scatter), adds chart configuration (subtitle, colors, data labels, tooltips, number/date formatting), and heuristic `recommendChart()` suggestions from column shape. Output is renderer-neutral; Numeriq remains an early development build, not yet a production-stability promise.
 
 ## Requirements
 
@@ -289,6 +289,23 @@ console.log(chartData); // Dataset columns: Category, Total_Amount, Product
 
 Groups remain in first-seen order unless `sort: { by: 'x' | 'y' | 'series', direction: 'asc' | 'desc' }` is provided; sorting is stable and nulls remain last. Common `options` are `legend` and `grid`. Bar charts also accept `stacked` and `orientation: 'vertical' | 'horizontal'`; line charts accept `connectNulls`; scatter charts accept a positive `pointSize`. Invalid fields and chart-specific options are rejected. Serialize with `JSON.stringify(spec)` and restore with `ChartSpec.fromJSON(document)` or `createChartSpec(document)`. The API is also exported from `numeriq/charts`, and prepared chart data can come from any Dataset, including v0.7 scorecards and v0.8 findings.
 
+## Visualization engine (v0.16.0)
+
+The chart-spec system (v0.9.0) now supports 11 renderer-neutral chart types: `bar` (with horizontal orientation), `line`, `area`, `pie`, `donut`, `scatter`, `bubble` (x/y/size), `histogram` (configurable `bins`), `boxplot` (five-number summaries per category), `heatmap` (co-occurrence counts), and `funnel`. All prepare chart-ready Dataset data through the same `prepare(dataset)` contract and work directly as dashboard chart panels.
+
+```js
+const chart = sales.chart({ type: 'bar', x: 'month', y: 'revenue', title: 'Monthly Revenue', aggregate: { op: 'sum' } });
+const data = chart.prepare(sales);
+```
+
+**Configuration** — `subtitle`, `colors` (color array), `dataLabels`, `tooltips`, `numberFormat`, and `dateFormat` fields join the existing `title`/`xLabel`/`yLabel`/legend/grid/stacking/sorting options. All are validated at definition time and serialized in the spec document (version 2; v1 documents from v0.9.0 restore unchanged with new fields null).
+
+**Recommendations** — `recommendChart(xInfo, yInfo?)` suggests a chart type plus alternatives from column types, cardinality, and data shape (temporal+numeric → line, numeric+numeric → scatter, few categories → pie, two categoricals → heatmap, single numeric → histogram). Suggestions are heuristics, explicitly not statistical conclusions — every result carries a `disclaimer` field saying so.
+
+**Dashboard integration** — extended chart types work directly as dashboard chart panels, and one reusable chart specification can prepare multiple different datasets. The core library remains framework-independent: specs and prepared data are renderer-neutral, with no DOM or frontend dependency.
+
+**Examples** — `examples/basic/index.js` covers Node.js usage; `examples/browser/index.html` shows the same chart-spec flow in a browser script tag.
+
 ## Data lineage and schema management (v0.15.0)
 
 **Lineage.** Every `AnalysisResult` carries lightweight, immutable provenance, inspectable with `result.lineage()` or `result.history()`: the source dataset name/id and creation time, the operation chain that produced the result (`analyze`, `window`, `join`, pivot, and so on), and operation parameters where JSON-safe. Lineage propagates through derived results without copying datasets — row data never appears in a lineage object, and mutating the returned object does not affect the result.
@@ -521,6 +538,7 @@ In Node.js, `console.log(dataset)` uses Node's custom inspection hook to display
 - `0.13.0` Window functions and advanced analytics: window builder with ranking (rowNumber, rank, denseRank, percentRank, cumeDist, ntile), offsets (lag, lead, firstValue, lastValue, nthValue with offsets/defaults), cumulative (sum, mean, min, max, count), rolling (mean, sum, min, max, std with window/minPeriods), time-based (pctChange/growthRate with periods), multi-column partitioning/ordering with documented null and tie behavior, row preservation, declarative seed/toJSON/fromJSON replay, and TypeScript declarations.
 - `0.14.0` Data reshaping: pivot (long to wide with the full aggregation catalog, fillValue, first-seen ordering), melt (wide to long with idVars/valueVars/varName/valueName), crosstab (counts, values aggregations, row/column/total percentages, totals row/column), transpose, and explode — all composable AnalysisResult output with lineage, source immutability, empty-dataset handling, and TypeScript declarations.
 - `0.15.0` Data lineage and schema management: structured immutable lineage on every AnalysisResult (source, operations, parameters, parent-child propagation, no dataset copies), schema definitions with types/nullability/required/constraints (min, max, minLength, maxLength, pattern, enum, unique, custom), `validateSchema`/`isValid`/`validationReport`/`assertSchema` on Dataset and AnalysisResult, optional relationship definitions with cardinality and orphan/duplicate-key reports, and a lightweight in-memory DatasetCollection.
+- `0.16.0` Visualization engine: ChartSpec expanded from 3 to 11 renderer-neutral chart types (area, pie, donut, bubble, histogram, boxplot, heatmap, funnel added), chart configuration (subtitle, colors, dataLabels, tooltips, numberFormat, dateFormat), `recommendChart()` heuristic suggestions with an explicit not-a-conclusion disclaimer, `chart()` convenience method on Dataset and AnalysisResult, reusable specs across datasets in dashboard panels, versioned spec documents (v1 compatible, v2 extended), and Node.js + browser examples.
 - `1.0.0` Stable integrated API.
 
 The roadmap is directional; features are not considered implemented until present in the corresponding release.

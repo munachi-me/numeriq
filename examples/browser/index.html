@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Numeriq browser example — chart specs</title>
+</head>
+<body>
+  <h1>Numeriq chart specifications in the browser</h1>
+  <p>Open the console to see the prepared chart data. Numeriq is renderer-neutral:
+     the spec and prepared Dataset are plain JSON-safe objects any charting
+     library (Chart.js, ECharts, D3) can consume.</p>
+  <script type="module">
+    // Adjust the path when serving from the repo root.
+    import { createDataset, createChartSpec, recommendChart } from '../../src/index.js';
+
+    const sales = createDataset([
+      { month: '2026-01', revenue: 100 },
+      { month: '2026-02', revenue: 200 },
+      { month: '2026-03', revenue: 150 }
+    ]);
+
+    const chart = sales.chart({
+      type: 'bar', x: 'month', y: 'revenue', aggregate: { op: 'sum' },
+      title: 'Monthly Revenue', colors: ['#4e79a7'], dataLabels: true
+    });
+    console.log('chart spec:', chart.toJSON());
+    console.log('chart-ready data:', chart.prepare(sales).rows);
+    console.log('recommendation:', recommendChart(
+      { name: 'month', type: 'date' }, { name: 'revenue', type: 'number' }
+    ));
+  </script>
+</body>
+</html>

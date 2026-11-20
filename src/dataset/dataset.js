@@ -13,6 +13,7 @@ import { createQuery, compileCondition } from './query.js';
 import { executeJoin, toJoinContext } from './joins.js';
 import { WindowBuilder } from './windows.js';
 import { pivot, melt, crosstab, transpose, explode } from './reshape.js';
+import { createChartSpec } from './charts.js';
 import { SchemaDefinition, buildValidationReport } from './schema.js';
 import { evaluateExpression } from './expressions.js';
 
@@ -177,6 +178,7 @@ export class Dataset {
     const result = compute();
     return new AnalysisResult(result.rows, result.columns, { lineage: { ...this.#lineageValue(), operation } });
   }
+  chart(definition) { return createChartSpec(definition); }
   validateSchema(definition) { return new SchemaDefinition(definition).validate(this.rows, this.#columns); }
   isValid(definition) { return this.validateSchema(definition).valid; }
   validationReport(definition = null) { return buildValidationReport(this.rows, this.#columns, definition); }

@@ -4,7 +4,7 @@ import { AnalysisResult } from './dataset/analysis-result.js';
 import { AnalysisBuilder } from './dataset/analysis.js';
 import { MetricSet, createMetricSet } from './dataset/metrics.js';
 import { InsightSet, createInsightSet } from './dataset/insights.js';
-import { ChartSpec, createChartSpec } from './dataset/charts.js';
+import { ChartSpec, createChartSpec, recommendChart } from './dataset/charts.js';
 import { DashboardSpec, createDashboardSpec } from './dataset/dashboard.js';
 import { ReportSpec, createReportSpec } from './dataset/report.js';
 import { TransformationPipeline, createPipeline } from './dataset/pipeline.js';
@@ -26,7 +26,7 @@ import * as statistics from './stats/descriptive.js';
 
 export {
   Dataset, createDataset, GroupedDataset, AnalysisResult, AnalysisBuilder,
-  MetricSet, createMetricSet, InsightSet, createInsightSet, ChartSpec, createChartSpec,
+  MetricSet, createMetricSet, InsightSet, createInsightSet, ChartSpec, createChartSpec, recommendChart,
   DashboardSpec, createDashboardSpec, ReportSpec, createReportSpec,
   TransformationPipeline, createPipeline, Query, createQuery, Series, WindowBuilder,
   pivot, melt, crosstab, transpose, explode, SchemaDefinition, createSchema, DatasetCollection, createCollection,
@@ -39,7 +39,7 @@ export {
 /** Default namespace: `import Numeriq from 'numeriq'` mirrors the named exports. */
 const Numeriq = {
   Dataset, createDataset, GroupedDataset, AnalysisResult, AnalysisBuilder,
-  MetricSet, createMetricSet, InsightSet, createInsightSet, ChartSpec, createChartSpec,
+  MetricSet, createMetricSet, InsightSet, createInsightSet, ChartSpec, createChartSpec, recommendChart,
   DashboardSpec, createDashboardSpec, ReportSpec, createReportSpec,
   TransformationPipeline, createPipeline, Query, createQuery, Series, WindowBuilder,
   pivot, melt, crosstab, transpose, explode, SchemaDefinition, createSchema, DatasetCollection, createCollection,
